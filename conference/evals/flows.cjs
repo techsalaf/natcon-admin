@@ -14,7 +14,9 @@ const cases={
   'ticket failure visible':ticket.includes("status.className='notice error'"),
   'QR failure blocks misleading print':ticket.includes("getElementById('print-ticket').disabled = true"),
   'no invented programme times':html.includes('Detailed session times will be announced'),
-  'ticket print offered':ticket.includes('window.print()')
+  'ticket print offered':ticket.includes('window.print()'),
+  'delegate profile collects requested fields':['email','course','institution','level','whatsapp','calling_line','state_origin','times_attended'].every(field=>js.includes(`data-field="${field}"`)),
+  'graduate and NYSC statuses available':js.includes('Graduate')&&js.includes('NYSC Corp Member')&&js.includes('Masters')
 };
 for(const [name,pass] of Object.entries(cases))console.log(`${pass?'PASS':'FAIL'} ${name}`);
 const score=Object.values(cases).filter(Boolean).length;

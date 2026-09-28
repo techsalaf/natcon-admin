@@ -56,7 +56,7 @@ try {
         if(!empty($_GET['q'])){$sql.=' AND (d.name LIKE ? OR d.phone LIKE ? OR d.reference LIKE ? OR d.email LIKE ?)';$v='%'.clean($_GET['q']).'%';$args=[$v,$v,$v,$v];}
         if(!empty($_GET['status'])){$sql.=' AND o.status=?';$args[]=clean($_GET['status']);}$rows=query($db,$sql.' ORDER BY d.id DESC',$args)->fetchAll();
         if($action==='delegates')respond($rows);
-        requireStaff(['admin','finance']);header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="natcon-delegates.csv"');$out=fopen('php://output','w');$keys=['id','name','email','phone','chapter','state','education','reference','status','checked_in','accommodation','accessibility'];fputcsv($out,$keys);
+        requireStaff(['admin','finance']);header('Content-Type: text/csv; charset=utf-8');header('Content-Disposition: attachment; filename="natcon-delegates.csv"');$out=fopen('php://output','w');$keys=['id','name','email','whatsapp','calling_line','course','institution','level','state_origin','times_attended','chapter','reference','status','checked_in','accommodation','accessibility'];fputcsv($out,$keys);
         foreach($rows as $r)fputcsv($out,array_map(static function($k)use($r){$v=(string)($r[$k]??'');return preg_match('/^[=+@\-\t\r]/',$v)?"'".$v:$v;},$keys));exit;
     }
     if($action==='checkin'){requireStaff(['admin','registrar']);respond(checkin($db,$c,clean($in['token']??''),clean($in['mode']??'arrival'),(int)$user['id']));}

@@ -21,7 +21,7 @@ function migrate(\PDO $db): void {
     $id=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INTEGER PRIMARY KEY AUTOINCREMENT':'BIGINT PRIMARY KEY AUTO_INCREMENT';
     foreach ([
         "natcon_orders (id $id, reference VARCHAR(64) NOT NULL UNIQUE, access_token VARCHAR(64) NOT NULL UNIQUE, payer_name VARCHAR(150) NOT NULL, payer_email VARCHAR(190) NOT NULL, payer_phone VARCHAR(40) NOT NULL, amount_kobo INTEGER NOT NULL, currency VARCHAR(3) NOT NULL, status VARCHAR(30) NOT NULL, bank_reference VARCHAR(190), sender_name VARCHAR(150), paid_on VARCHAR(30), created_at VARCHAR(30) NOT NULL, paid_at VARCHAR(30))",
-        "natcon_delegates (id $id, reference VARCHAR(64) NOT NULL, name VARCHAR(150) NOT NULL, email VARCHAR(190), phone VARCHAR(40), chapter VARCHAR(150), state VARCHAR(100), education VARCHAR(100), accommodation VARCHAR(100), accessibility TEXT, ticket_token VARCHAR(64) NOT NULL UNIQUE)",
+        "natcon_delegates (id $id, reference VARCHAR(64) NOT NULL, name VARCHAR(150) NOT NULL, email VARCHAR(190), phone VARCHAR(40), chapter VARCHAR(150), state VARCHAR(100), education VARCHAR(100), accommodation VARCHAR(100), accessibility TEXT, course VARCHAR(150), institution VARCHAR(190), level VARCHAR(80), whatsapp VARCHAR(40), calling_line VARCHAR(40), state_origin VARCHAR(100), times_attended INTEGER NOT NULL DEFAULT 0, ticket_token VARCHAR(64) NOT NULL UNIQUE)",
         "natcon_staff (id $id, name VARCHAR(150) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, role VARCHAR(30) NOT NULL)",
         "natcon_checkins (id $id, delegate_id BIGINT NOT NULL, slot VARCHAR(80) NOT NULL, staff_id BIGINT NOT NULL, checked_at VARCHAR(30) NOT NULL, UNIQUE(delegate_id,slot))",
         "natcon_claims (id $id, delegate_id BIGINT NOT NULL, kind VARCHAR(30) NOT NULL, slot VARCHAR(80) NOT NULL, staff_id BIGINT NOT NULL, created_at VARCHAR(30) NOT NULL, UNIQUE(delegate_id,kind,slot))",
@@ -31,6 +31,13 @@ function migrate(\PDO $db): void {
         "natcon_transfer_receipts (bank_reference VARCHAR(190) PRIMARY KEY, reference VARCHAR(64) NOT NULL UNIQUE, amount_kobo INTEGER NOT NULL, staff_id BIGINT NOT NULL, verified_at VARCHAR(30) NOT NULL)",
         "natcon_locks (name VARCHAR(50) PRIMARY KEY, value INTEGER NOT NULL)"
     ] as $schema) $db->exec('CREATE TABLE IF NOT EXISTS '.$schema);
+    // Safe, repeatable upgrade for delegates already registered on an older release.
+    $driver=$db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+    $columns=$driver==='sqlite'
+        ? array_column($db->query('PRAGMA table_info(natcon_delegates)')->fetchAll(), 'name')
+        : array_column(query($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='natcon_delegates'")->fetchAll(), 'COLUMN_NAME');
+    foreach(['course'=>'VARCHAR(150) NULL','institution'=>'VARCHAR(190) NULL','level'=>'VARCHAR(80) NULL','whatsapp'=>'VARCHAR(40) NULL','calling_line'=>'VARCHAR(40) NULL','state_origin'=>'VARCHAR(100) NULL','times_attended'=>'INTEGER NOT NULL DEFAULT 0'] as $column=>$type)
+        if(!in_array($column,$columns,true)) $db->exec("ALTER TABLE natcon_delegates ADD COLUMN $column $type");
     $insert=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INSERT OR IGNORE':'INSERT IGNORE';
     $db->exec("$insert INTO natcon_locks(name,value) VALUES('registration',0)");
 }
@@ -51,7 +58,11 @@ function register(\PDO $db,array $c,array $in): array {
     if((new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d H:i:s')>$c['registration_closes'])throw new \InvalidArgumentException('Registration has closed. Contact the organizers.');
     $name=clean($in['payer_name']??'',150);$email=strtolower(clean($in['payer_email']??''));$phone=clean($in['payer_phone']??'',40);$delegates=$in['delegates']??[];
     if(!$name || !filter_var($email,FILTER_VALIDATE_EMAIL) || !$phone || !is_array($delegates) || count($delegates)<1 || count($delegates)>50) throw new \InvalidArgumentException('Provide payer name, valid email, phone, and between 1 and 50 delegates.');
-    foreach($delegates as $d) if(!is_array($d)||!clean($d['name']??'',150) || (!empty($d['email'])&&!filter_var($d['email'],FILTER_VALIDATE_EMAIL))) throw new \InvalidArgumentException('Every delegate needs a name and any supplied email must be valid.');
+    foreach($delegates as $d) {
+        if(!is_array($d)||!clean($d['name']??'',150) || !filter_var(clean($d['email']??''),FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Every delegate needs a name and valid Gmail or email address.');
+        foreach(['course','institution','level','whatsapp','state_origin'] as $required) if(!clean($d[$required]??'')) throw new \InvalidArgumentException('Complete each delegate’s course, institution, level, WhatsApp number, and state of origin.');
+        if(!preg_match('/^\d{1,2}$/',clean($d['times_attended']??'')) || (int)$d['times_attended']>99) throw new \InvalidArgumentException('Enter NATCON attendance from 0 to 99.');
+    }
     $ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$amount=event($c)['price_kobo']*count($delegates);
     $db->beginTransaction();try {
         // Serialize capacity reservation across workers, including SQLite test deployments.
@@ -59,7 +70,7 @@ function register(\PDO $db,array $c,array $in): array {
         $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid')")->fetchColumn();
         if($c['capacity']>0 && $reserved+count($delegates)>$c['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
         query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now()]);
-        foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),clean($d['email']??''),clean($d['phone']??'',40),clean($d['chapter']??'',150),clean($d['state']??'',100),clean($d['education']??'',100),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),bin2hex(random_bytes(32))]);
+        foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['chapter']??'',150),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
         audit($db,'public','registered',$ref,['delegates'=>count($delegates),'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}
     return order($db,$ref,$token)+['payment_enabled'=>$c['secret']!==''];

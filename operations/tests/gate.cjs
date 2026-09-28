@@ -19,6 +19,7 @@ const cases = {
   'scanner handles already-checked-in state': js.includes('already_checked_in'),
   'camera is stopped when hidden': js.includes("document.addEventListener('visibilitychange'") && js.includes('stopCamera'),
   'untrusted delegate strings use DOM text nodes': js.includes("detailCell(delegate.name") && js.includes("document.createElement(tag)"),
+  'staff register shows course institution status and NATCON history': js.includes('delegate.course') && js.includes('delegate.institution') && js.includes('delegate.level') && js.includes('delegate.times_attended'),
 };
 
 for (const [name, passed] of Object.entries(cases)) {

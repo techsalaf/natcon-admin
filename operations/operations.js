@@ -91,7 +91,7 @@
     $('delegate-empty').hidden = records.length > 0;
     records.forEach((delegate) => {
       const tr = node('tr');
-      tr.append(detailCell(delegate.name, delegate.phone || delegate.email), detailCell(delegate.chapter || 'Independent', delegate.state), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
+      tr.append(detailCell(delegate.name, delegate.email || delegate.whatsapp), detailCell(delegate.course || 'Course not supplied', [delegate.institution, delegate.level, delegate.state_origin, `${delegate.times_attended || 0} NATCONs`].filter(Boolean).join(' · ')), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
       const payment = node('td'), safeStatus = ['paid', 'pending', 'cancelled'].includes(delegate.status) ? delegate.status : '';
       payment.append(node('span', (delegate.status || 'pending').replace(/_/g, ' '), 'status ' + safeStatus)); tr.append(payment);
       tr.append(detailCell(delegate.checked_in ? 'Arrived' : 'Not arrived'));
