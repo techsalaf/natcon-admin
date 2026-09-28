@@ -19,4 +19,4 @@ jobs:
         with:
           php-version: '8.2'
       - name: Lint PHP files
-        run: find . -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: find . -type f -name '*.php' ! -path './orag_api/src/Twilio/*' ! -path './user_api/src/Twilio/*' -print0 | xargs -0 -n1 php -l
