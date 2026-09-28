@@ -1,0 +1,30 @@
+# Local secrets and machine-specific settings
+.env
+.env.*
+!.env.example
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.mobileprovision
+
+# Local diagnostics
+/debug_activation_data.html
+/test.txt
+
+# Flutter and Android build output
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.gradle/
+**/.symlinks/
+**/build/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+
+# IDE and operating system files
+**/.idea/
+*.iml
+.DS_Store
+Thumbs.db

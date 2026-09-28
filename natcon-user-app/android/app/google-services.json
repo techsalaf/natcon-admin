@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "634529334132",
+    "project_id": "delivery-king-c74cb",
+    "storage_bucket": "delivery-king-c74cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:634529334132:android:552652f3239d91d9022221",
+        "android_client_info": {
+          "package_name": "com.eventlycustomerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAvZ__nrGpyW0EKuHUUU4zJ4XWprOB-jNM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

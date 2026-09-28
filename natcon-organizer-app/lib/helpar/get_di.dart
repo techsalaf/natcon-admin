@@ -1,0 +1,43 @@
+import 'package:magicmate_organizer/Getx_controller.dart/Add_coupon_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Add_extra_image_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Addartist_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Addeventlist_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Addeventtypeprice_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Artist_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Category_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Coupon_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Dashboard_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Eventtypeprice_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Extra_image_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Listofevent_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/Todayevent_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/eventdetails_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/gallery_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/notification_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/payout_controller.dart';
+import 'package:magicmate_organizer/Getx_controller.dart/trems_condition_controller.dart';
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+init() async {
+  final sharedPreferences = await SharedPreferences.getInstance();
+  Get.lazyPut(() => sharedPreferences);
+  Get.lazyPut(() => AddCouponlistController());
+  Get.lazyPut(() => AddcoverimageController());
+  Get.lazyPut(() => AddartistController());
+  Get.lazyPut(() => AddlistofeventController());
+  Get.lazyPut(() => AddeventtypepriceController());
+  Get.lazyPut(() => ArtistController());
+  Get.lazyPut(() => CategoryController());
+  Get.lazyPut(() => CouponController());
+  Get.lazyPut(() => DashboardController());
+  Get.lazyPut(() => EventtypepriceController());
+  Get.lazyPut(() => CoverimageController());
+  Get.lazyPut(() => ListofeventController());
+  Get.lazyPut(() => StatuswiseeventController());
+  Get.lazyPut(() => PageListController());
+  Get.lazyPut(() => GalleryController());
+  Get.lazyPut(() => EventDetailsController());
+  Get.lazyPut(() => PayOutController());
+  Get.lazyPut(() => NotificationController());
+}
