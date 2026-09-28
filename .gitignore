@@ -19,6 +19,7 @@
 **/.flutter-plugins
 **/.flutter-plugins-dependencies
 **/.gradle/
+**/.kotlin/
 **/.symlinks/
 **/build/
 **/ios/Flutter/Generated.xcconfig

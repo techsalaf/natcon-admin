@@ -2,7 +2,7 @@
 declare(strict_types=1);
 require dirname(__DIR__).'/bootstrap.php';
 use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover};
-$db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);$c=config();$checks=0;
+$db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);migrate($db);$c=config();$checks=0;
 function delegateInput(string $name,string $email): array { return ['name'=>$name,'email'=>$email,'course'=>'Islamic Studies','institution'=>'Test University','level'=>'Graduate','whatsapp'=>'08000000000','calling_line'=>'','state_origin'=>'Osun','times_attended'=>'2']; }
 function check($yes,string $label): void {global $checks;if(!$yes)throw new RuntimeException($label);$checks++;}
 function rejects(callable $fn,string $label):void {try{$fn();}catch(InvalidArgumentException $e){check(true,$label);return;}throw new RuntimeException($label);}
