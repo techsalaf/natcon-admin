@@ -3,7 +3,7 @@
    
         ?>
 <script>
-   window.location.href="/";
+   window.location.href="<?php echo $base; ?>/";
 </script>
 <?php
    }
