@@ -1,0 +1,4 @@
+# Legacy bundled actions do not belong on public URLs.
+<FilesMatch "(?i)\\.php$">
+    Require all denied
+</FilesMatch>
