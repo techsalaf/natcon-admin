@@ -48,7 +48,7 @@ include 'evconfing.php';
       .page-header .header-logo-wrapper .logo-wrapper img,
       .sidebar-wrapper .logo-wrapper > a > img,
       .sidebar-wrapper .back-btn > a > img,
-      .login-main .logo img {
+      .login-card .logo img {
         width: auto;
         height: auto;
         max-width: 140px;
