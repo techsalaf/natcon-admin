@@ -1,7 +1,7 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings, constant_identifier_names
 
 class AppUrl {
-  static const String imageurl = "https://magicmate.cscodetech.cloud/";
+  static const String imageurl = String.fromEnvironment('NATCON_BASE_URL', defaultValue: 'https://unconfigured.invalid/');
   static const String baseUrl ='$imageurl/orag_api/';
 
   static const oneSignel = "*************";

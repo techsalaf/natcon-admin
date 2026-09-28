@@ -1,0 +1,16 @@
+name: natcon_mobile
+description: Shared NATCON delegate and registrar clients.
+version: 1.0.0
+publish_to: none
+environment:
+  sdk: ^3.8.1
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.2
+  url_launcher: ^6.3.0
+  mobile_scanner: ^7.0.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

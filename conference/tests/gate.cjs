@@ -1,0 +1,26 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const path = require('node:path');
+const base = path.join(__dirname,'..');
+let response = {ok:true,json:async()=>({ok:true,data:{status:'pending'}})};
+const context = {window:{},document:{getElementById:()=>null},navigator:{},URLSearchParams,Intl,fetch:async()=>response};
+vm.runInNewContext(fs.readFileSync(path.join(base,'assets/app.js'),'utf8'),context);
+const {escape,money,api} = context.window.NatconUI;
+(async()=>{
+  assert.equal(escape('<img src=x onerror="bad">'), '&lt;img src=x onerror=&quot;bad&quot;&gt;');
+  assert.equal(escape("O'Connor & co"), 'O&#39;Connor &amp; co');
+  assert.equal(escape(null),'');
+  assert.match(money(800000),/8,000/);
+  assert.equal((await api('order',{},'GET')).status,'pending');
+  response={ok:false,json:async()=>({ok:false,error:'Invalid token'})};
+  await assert.rejects(api('ticket',{},'GET'),/Invalid token/);
+  response={ok:false,json:async()=>{throw new Error('HTML response')}};
+  await assert.rejects(api('event',{},'GET'),/unavailable/);
+  const sw=fs.readFileSync(path.join(base,'sw.js'),'utf8');
+  assert.match(sw,/ASSETS\.includes\(relative\) && !url\.search/);
+  assert.doesNotMatch(sw,/cache\.put/);
+  assert.doesNotMatch(fs.readFileSync(path.join(base,'assets/app.js'),'utf8'),/localStorage|sessionStorage|innerHTML\s*=\s*(?:error|result)\./);
+  console.log('PASS: 10 portal gates, including escaping, API failures, currency and private cache boundary');
+})().catch(error=>{console.error(error);process.exitCode=1});

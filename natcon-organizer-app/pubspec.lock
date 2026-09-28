@@ -944,6 +944,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
+  natcon_mobile:
+    dependency: "direct main"
+    description:
+      path: "../services/mobile"
+      relative: true
+    source: path
+    version: "1.0.0"
   nested:
     dependency: transitive
     description:

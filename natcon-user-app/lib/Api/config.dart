@@ -1,6 +1,6 @@
 class Config {
 
-  static const String imageUrl = 'https://magicmate.cscodetech.cloud/';
+  static const String imageUrl = String.fromEnvironment('NATCON_BASE_URL', defaultValue: 'https://unconfigured.invalid/');
 
   static const paymentBaseUrl = imageUrl;
 

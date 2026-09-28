@@ -1,0 +1,11 @@
+{
+  "threshold": 1,
+  "scenarios": [
+    {"workflow":"group payment", "expectation":"One server-priced payment issues distinct tickets for every delegate; amount spoofing fails."},
+    {"workflow":"payment replay", "expectation":"Repeated signed webhook and browser callback create one paid transition and one email."},
+    {"workflow":"late arrival", "expectation":"A first arrival October 2, 3 or 4 is accepted; repeated arrival is rejected."},
+    {"workflow":"bank transfer", "expectation":"Receipt claim remains pending until finance reconciles the bank reference."},
+    {"workflow":"staff privilege", "expectation":"Registrar cannot approve money; missing CSRF cannot change data."},
+    {"workflow":"failed email", "expectation":"Failed delivery remains queued, attempts are visible, ticket remains recoverable."}
+  ]
+}

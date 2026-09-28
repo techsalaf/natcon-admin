@@ -1,0 +1,68 @@
+<?php
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: no-referrer');
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
+?>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101c43">
+  <meta name="robots" content="noindex,nofollow">
+  <title>NATCON 2026 · Conference operations</title>
+  <link rel="stylesheet" href="./operations.css">
+  <script src="./core.js" defer></script>
+  <script src="./operations.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+<div id="loading" class="loading">Connecting to conference operations…</div>
+<section id="login-view" class="login-layout" hidden aria-label="Staff sign in">
+  <div class="login-story">
+    <a class="brand" href="../conference/"><span class="brand-mark">TAA</span><span>NATCON <b>2026</b><small>THE ACHIEVER AMBASSADORS ISLAMIC FOUNDATION</small></span></a>
+    <div><p class="eyebrow gold">THE 7TH ANNUAL NATIONAL CONFERENCE</p><h1>Every delegate.<br>A warm welcome.</h1><p class="story-copy">The people behind a purposeful gathering. Manage registrations, welcome delegates, and keep the conference moving.</p></div>
+    <div class="event-details"><span>01 — 04 OCTOBER 2026</span><span>IWO, OSUN STATE</span></div>
+  </div>
+  <div class="login-card"><span class="eyebrow">CONFERENCE OPERATIONS</span><h2>Welcome, team.</h2><p>Sign in with your assigned staff account.</p>
+    <form id="login-form">
+      <label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="username" required placeholder="you@example.org">
+      <label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required>
+      <p id="login-error" class="error" role="alert" hidden></p>
+      <button class="primary full" type="submit">Sign in to operations <span aria-hidden="true">→</span></button>
+    </form><p class="help-copy">Need access? Contact your TAA technical team administrator.</p>
+  </div>
+</section>
+<div id="app" class="app-layout" hidden>
+  <aside class="sidebar">
+    <a class="brand" href="../conference/"><span class="brand-mark">TAA</span><span>NATCON <b>2026</b><small>CONFERENCE OPERATIONS</small></span></a>
+    <div class="conference-pill"><span class="live-dot"></span> REFORMATION 2026</div>
+    <nav aria-label="Operations"><button data-view="overview" class="nav-item active"><span aria-hidden="true">▦</span> Overview</button><button data-view="delegates" class="nav-item"><span aria-hidden="true">◎</span> Delegates</button><button data-view="scanner" class="nav-item"><span aria-hidden="true">⌗</span> Welcome desk</button><button data-view="transfers" class="nav-item" data-finance><span aria-hidden="true">⇄</span> Bank transfers</button></nav>
+    <div class="sidebar-bottom"><p>Knowledge with Purpose</p><small>Raising Responsible Muslim Leaders.</small><div class="staff-profile"><span id="staff-avatar" class="avatar">T</span><div><strong id="staff-name"></strong><small id="staff-role"></small></div></div><button id="logout" class="logout">Sign out <span aria-hidden="true">↗</span></button></div>
+  </aside>
+  <main id="main" tabindex="-1">
+    <header class="topbar"><div><p class="eyebrow">NATCON 2026 / OPERATIONS</p><h1 id="page-title">Conference overview</h1></div><div class="topbar-meta"><span class="date-label">01–04 October · Iwo</span><button id="refresh" class="secondary">↻ <span>Refresh</span></button></div></header>
+    <p id="page-error" class="error banner" role="alert" hidden></p>
+    <section id="view-overview" class="view" aria-label="Conference overview">
+      <div class="welcome-banner"><div><span class="eyebrow gold">A GATHERING WITH PURPOSE</span><h2>Ready to welcome our delegates.</h2><p>Your live picture of registration, payment, and arrival.</p></div><button class="light-button" data-go="scanner">Open welcome desk <span aria-hidden="true">→</span></button></div>
+      <div class="stats"><article class="stat"><span>Total delegates</span><strong id="metric-total">—</strong><small>Registered for NATCON</small></article><article class="stat"><span>Paid delegates</span><strong id="metric-paid">—</strong><small>Payment confirmed</small></article><article class="stat"><span>Arrived</span><strong id="metric-arrived">—</strong><small>Unique delegates welcomed</small></article><article class="stat" data-finance><span>Registration revenue</span><strong id="metric-revenue">—</strong><small>Confirmed payments</small></article></div>
+      <div class="overview-grid"><article class="panel"><div class="panel-heading"><div><p class="eyebrow">REPRESENTATION</p><h2>Chapters coming together</h2></div><span id="chapter-count" class="badge">— chapters</span></div><div id="chapters" class="chapter-list"></div></article><article class="panel next-steps"><p class="eyebrow">THE OPERATIONS DESK</p><h2>Keep things moving.</h2><button class="task-link" data-go="scanner"><span><strong>Welcome a delegate</strong><small>Scan a ticket or enter its code</small></span><span aria-hidden="true">→</span></button><button class="task-link" data-go="delegates"><span><strong>Find a registration</strong><small>Search by name, phone, or reference</small></span><span aria-hidden="true">→</span></button><button class="task-link" data-go="transfers" data-finance><span><strong>Reconcile bank transfers</strong><small id="pending-label">Check pending payments</small></span><span aria-hidden="true">→</span></button><p class="footnote">Counts update when you refresh. Every successful check-in and approval is recorded by the server.</p></article></div>
+    </section>
+    <section id="view-delegates" class="view" aria-label="Delegate register" hidden>
+      <div class="panel"><div class="panel-heading"><div><p class="eyebrow">PEOPLE & REGISTRATIONS</p><h2>Delegate register</h2></div><button id="export" class="secondary" data-finance>↓ Export CSV</button></div><form id="search-form" class="filter-row"><label class="search-label" for="delegate-query"><span class="sr-only">Search delegates</span><input id="delegate-query" type="search" placeholder="Search name, phone, email or reference…"></label><label><span class="sr-only">Payment status</span><select id="delegate-status"><option value="">All statuses</option><option value="paid">Paid</option><option value="pending">Pending payment</option><option value="awaiting_review">Transfer under review</option><option value="refunded">Refunded</option><option value="cancelled">Cancelled</option></select></label><button class="primary" type="submit">Search</button></form><p id="delegate-count" class="muted"></p><div class="table-wrap"><table><thead><tr><th>Delegate</th><th>Chapter / State</th><th>Registration</th><th>Payment</th><th>Arrival</th><th>Actions</th></tr></thead><tbody id="delegate-rows"></tbody></table></div><div id="delegate-empty" class="empty" hidden>No delegates match your search.</div></div>
+    </section>
+    <section id="view-scanner" class="view" aria-label="Welcome desk" hidden>
+      <div class="scanner-grid"><article class="panel"><p class="eyebrow">WELCOME DESK</p><h2>A ticket. A person. A welcome.</h2><p class="muted">Scan a delegate’s QR code or enter the ticket code printed below it.</p><label for="checkin-mode">Record this visit as</label><select id="checkin-mode"><option value="arrival">First arrival · once per conference</option><option value="daily">Daily attendance · once per day</option><option value="reentry">Re-entry · record another visit</option></select><div class="camera-box"><video id="camera" autoplay muted playsinline hidden></video><div id="camera-placeholder"><span aria-hidden="true" class="scan-icon">⌗</span><strong>Ready when you are</strong><p>Allow camera access to scan a ticket.</p></div></div><div class="camera-buttons"><button id="start-camera" class="primary">Start camera</button><button id="stop-camera" class="secondary" hidden>Stop camera</button></div><p id="camera-message" class="footnote" role="status">Camera scanning needs HTTPS or localhost. Manual entry works without camera access.</p><form id="checkin-form" class="manual-form"><label for="ticket-code">Ticket code or ticket link</label><div class="inline-form"><input id="ticket-code" autocomplete="off" spellcheck="false" required placeholder="Paste or type a ticket code"><button class="primary" type="submit">Check in</button></div></form></article><div><article id="scan-result" class="panel result-card" aria-live="polite"><span class="result-symbol" aria-hidden="true">◎</span><p class="eyebrow">TICKET VERIFICATION</p><h2>Waiting for a ticket</h2><p>Delegate details and the check-in result will appear here.</p></article><article id="logistics" class="panel logistics" hidden><p class="eyebrow">DELEGATE SERVICES</p><h2>Record an allocation</h2><form id="entitlement-form"><label for="entitlement-kind">Service</label><select id="entitlement-kind"><option value="meal">Meal</option><option value="material">Conference materials</option><option value="accommodation">Accommodation</option></select><label for="entitlement-slot">Allocation identifier</label><input id="entitlement-slot" required maxlength="80" placeholder="e.g. oct-01-lunch or hall-a-bed-12"><p class="footnote">Use your team’s agreed identifier. The same allocation cannot be issued twice to a delegate.</p><button class="secondary" type="submit">Record allocation</button></form></article></div></div>
+    </section>
+    <section id="view-transfers" class="view" aria-label="Transfer reconciliation" hidden><div class="panel"><div class="panel-heading"><div><p class="eyebrow">FINANCE DESK</p><h2>Transfers awaiting reconciliation</h2></div><span id="transfer-count" class="badge">— pending</span></div><p class="finance-note">Confirm the credit in the conference bank statement before approving. A submitted reference or receipt is not proof of a settled payment.</p><div id="transfer-list" class="transfer-list"></div><div id="transfer-empty" class="empty" hidden>You’re all caught up. No transfers await reconciliation.</div></div></section>
+    <footer>TAA · NATCON 2026 <span>Built for a purposeful gathering.</span></footer>
+  </main>
+</div>
+<dialog id="approve-dialog" aria-labelledby="approve-title"><form id="approve-form"><p class="eyebrow">PAYMENT RECONCILIATION</p><h2 id="approve-title">Confirm bank credit</h2><p id="approve-details"></p><label for="verified-amount">Amount credited in naira</label><input id="verified-amount" type="text" inputmode="decimal" required placeholder="Enter the amount shown on the bank statement"><label for="reconciliation-note">Bank transaction reference and reconciliation note</label><textarea id="reconciliation-note" rows="4" required minlength="10" maxlength="1000" placeholder="Bank statement reference, credited amount and date checked…"></textarea><label class="checkbox-label"><input id="credit-confirmed" type="checkbox" required><span>I checked the bank statement and matched the settled credit to this registration.</span></label><p id="approve-error" class="error" role="alert" hidden></p><div class="dialog-actions"><button id="cancel-approval" type="button" class="secondary">Cancel</button><button class="primary" type="submit">Approve payment</button></div></form></dialog>
+<dialog id="cancel-dialog" aria-labelledby="cancel-title"><form id="cancel-form"><p class="eyebrow">ORDER STATUS</p><h2 id="cancel-title">Cancel or record a refund</h2><p id="cancel-details"></p><label for="cancel-status">Action</label><select id="cancel-status"><option value="cancelled">Cancel registration</option><option value="refunded">Record a refund already settled externally</option></select><p>This does not send money. Complete any refund through your payment provider or bank before recording it here.</p><label for="cancel-reason">Reason and reference</label><textarea id="cancel-reason" required minlength="10" maxlength="1000" rows="3"></textarea><label class="checkbox-label"><input id="cancel-confirmed" type="checkbox" required><span>I confirm this change applies to every delegate on this order and any recorded refund has already been settled.</span></label><p id="cancel-error" class="error" role="alert" hidden></p><div class="dialog-actions"><button id="close-cancel" class="secondary" type="button">Keep registration</button><button class="primary" type="submit">Update order status</button></div></form></dialog>
+<noscript><p class="error">Enable JavaScript to use the staff console.</p></noscript>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<?php
+declare(strict_types=1);
+namespace Natcon;
+
+function config(): array {
+    $file = dirname(__DIR__, 2) . '/.env.natcon';
+    if (is_file($file)) foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        if (preg_match('/^([A-Z_0-9]+)=(.*)$/', trim($line), $m) && getenv($m[1]) === false) putenv($m[1].'='.trim($m[2], " \t\"'"));
+    }
+    return ['dsn'=>getenv('NATCON_DSN') ?: '', 'db_user'=>getenv('NATCON_DB_USER') ?: '', 'db_password'=>getenv('NATCON_DB_PASSWORD') ?: '',
+        'base_url'=>rtrim(getenv('NATCON_BASE_URL') ?: 'http://localhost/natcon-admin','/'), 'secret'=>getenv('PAYSTACK_SECRET_KEY') ?: '',
+        'name'=>'NATCON 2026 · Reformation', 'theme'=>'Knowledge with Purpose: Raising Responsible Muslim Leaders.',
+        'start_date'=>'2026-10-01','end_date'=>'2026-10-04','venue'=>'Shaykh Idrees Fazazi Mogaji Central Mosque, Iwo, Osun State',
+        'currency'=>'NGN','earlybird_end'=>'2026-09-15','capacity'=>(int)(getenv('NATCON_CAPACITY')?:0),'registration_closes'=>getenv('NATCON_REGISTRATION_CLOSES')?:'2026-10-04 23:59:59','bank'=>['name'=>'LOTUS Bank','account_name'=>'THE ACHIEVER AMBASSADOR (NATCON ACC)','account_number'=>'1014319395']];
+}
+function database(array $c): \PDO {
+    if (!$c['dsn']) throw new \RuntimeException('NATCON database is not configured. Run the setup instructions.');
+    return new \PDO($c['dsn'],$c['db_user'],$c['db_password'],[\PDO::ATTR_ERRMODE=>\PDO::ERRMODE_EXCEPTION,\PDO::ATTR_DEFAULT_FETCH_MODE=>\PDO::FETCH_ASSOC,\PDO::ATTR_EMULATE_PREPARES=>false]);
+}
+function migrate(\PDO $db): void {
+    $id=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INTEGER PRIMARY KEY AUTOINCREMENT':'BIGINT PRIMARY KEY AUTO_INCREMENT';
+    foreach ([
+        "natcon_orders (id $id, reference VARCHAR(64) NOT NULL UNIQUE, access_token VARCHAR(64) NOT NULL UNIQUE, payer_name VARCHAR(150) NOT NULL, payer_email VARCHAR(190) NOT NULL, payer_phone VARCHAR(40) NOT NULL, amount_kobo INTEGER NOT NULL, currency VARCHAR(3) NOT NULL, status VARCHAR(30) NOT NULL, bank_reference VARCHAR(190), sender_name VARCHAR(150), paid_on VARCHAR(30), created_at VARCHAR(30) NOT NULL, paid_at VARCHAR(30))",
+        "natcon_delegates (id $id, reference VARCHAR(64) NOT NULL, name VARCHAR(150) NOT NULL, email VARCHAR(190), phone VARCHAR(40), chapter VARCHAR(150), state VARCHAR(100), education VARCHAR(100), accommodation VARCHAR(100), accessibility TEXT, ticket_token VARCHAR(64) NOT NULL UNIQUE)",
+        "natcon_staff (id $id, name VARCHAR(150) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, role VARCHAR(30) NOT NULL)",
+        "natcon_checkins (id $id, delegate_id BIGINT NOT NULL, slot VARCHAR(80) NOT NULL, staff_id BIGINT NOT NULL, checked_at VARCHAR(30) NOT NULL, UNIQUE(delegate_id,slot))",
+        "natcon_claims (id $id, delegate_id BIGINT NOT NULL, kind VARCHAR(30) NOT NULL, slot VARCHAR(80) NOT NULL, staff_id BIGINT NOT NULL, created_at VARCHAR(30) NOT NULL, UNIQUE(delegate_id,kind,slot))",
+        "natcon_audit (id $id, actor VARCHAR(100) NOT NULL, action VARCHAR(60) NOT NULL, reference VARCHAR(100), detail TEXT, created_at VARCHAR(30) NOT NULL)",
+        "natcon_outbox (id $id, recipient VARCHAR(190) NOT NULL, subject VARCHAR(190) NOT NULL, body TEXT NOT NULL, status VARCHAR(20) NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL, sent_at VARCHAR(30))",
+        "natcon_limits (bucket VARCHAR(100) PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL)",
+        "natcon_transfer_receipts (bank_reference VARCHAR(190) PRIMARY KEY, reference VARCHAR(64) NOT NULL UNIQUE, amount_kobo INTEGER NOT NULL, staff_id BIGINT NOT NULL, verified_at VARCHAR(30) NOT NULL)",
+        "natcon_locks (name VARCHAR(50) PRIMARY KEY, value INTEGER NOT NULL)"
+    ] as $schema) $db->exec('CREATE TABLE IF NOT EXISTS '.$schema);
+    $insert=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INSERT OR IGNORE':'INSERT IGNORE';
+    $db->exec("$insert INTO natcon_locks(name,value) VALUES('registration',0)");
+}
+function now(): string { return gmdate('Y-m-d H:i:s'); }
+function query(\PDO $db,string $sql,array $args=[]): \PDOStatement { $q=$db->prepare($sql);$q->execute($args);return $q; }
+function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
+function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
+function event(array $c): array { $date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']))+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!=='']; }
+function order(\PDO $db,string $reference,string $token): array {
+    $o=query($db,'SELECT * FROM natcon_orders WHERE reference=? AND access_token=?',[$reference,$token])->fetch();
+    if (!$o) throw new \InvalidArgumentException('Registration not found.');
+    unset($o['id']); $o['delegates']=query($db,'SELECT id,name,ticket_token FROM natcon_delegates WHERE reference=?',[$reference])->fetchAll();
+    if($o['status']!=='paid') foreach($o['delegates'] as &$d) unset($d['ticket_token']);
+    return $o;
+}
+function register(\PDO $db,array $c,array $in): array {
+    if(($in['consent']??false)!==true)throw new \InvalidArgumentException('Accept the privacy notice before registering.');
+    if((new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d H:i:s')>$c['registration_closes'])throw new \InvalidArgumentException('Registration has closed. Contact the organizers.');
+    $name=clean($in['payer_name']??'',150);$email=strtolower(clean($in['payer_email']??''));$phone=clean($in['payer_phone']??'',40);$delegates=$in['delegates']??[];
+    if(!$name || !filter_var($email,FILTER_VALIDATE_EMAIL) || !$phone || !is_array($delegates) || count($delegates)<1 || count($delegates)>50) throw new \InvalidArgumentException('Provide payer name, valid email, phone, and between 1 and 50 delegates.');
+    foreach($delegates as $d) if(!is_array($d)||!clean($d['name']??'',150) || (!empty($d['email'])&&!filter_var($d['email'],FILTER_VALIDATE_EMAIL))) throw new \InvalidArgumentException('Every delegate needs a name and any supplied email must be valid.');
+    $ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$amount=event($c)['price_kobo']*count($delegates);
+    $db->beginTransaction();try {
+        // Serialize capacity reservation across workers, including SQLite test deployments.
+        query($db,"UPDATE natcon_locks SET value=value+1 WHERE name='registration'");
+        $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid')")->fetchColumn();
+        if($c['capacity']>0 && $reserved+count($delegates)>$c['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
+        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now()]);
+        foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),clean($d['email']??''),clean($d['phone']??'',40),clean($d['chapter']??'',150),clean($d['state']??'',100),clean($d['education']??'',100),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),bin2hex(random_bytes(32))]);
+        audit($db,'public','registered',$ref,['delegates'=>count($delegates),'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
+    }catch(\Throwable $e){$db->rollBack();throw $e;}
+    return order($db,$ref,$token)+['payment_enabled'=>$c['secret']!==''];
+}
+function queueTickets(\PDO $db,array $c,string $ref): void {
+    $o=query($db,'SELECT * FROM natcon_orders WHERE reference=? AND status=?',[$ref,'paid'])->fetch();if(!$o)throw new \InvalidArgumentException('Only paid registrations have tickets.');
+    $ds=query($db,'SELECT name,email,ticket_token FROM natcon_delegates WHERE reference=?',[$ref])->fetchAll();
+    $body="Assalamu alaykum {$o['payer_name']},\nYour NATCON registration {$ref} is confirmed.\n\n";
+    foreach($ds as $d)$body.=$d['name'].': '.$c['base_url'].'/conference/ticket.php#'.$d['ticket_token']."\n";
+    $body.="\nOctober 1–4, 2026. Present your personal ticket at the venue. Keep these links private.";
+    query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$o['payer_email'],'Your NATCON 2026 tickets',$body,'pending',now()]);
+    foreach($ds as $d)if($d['email'] && strcasecmp($d['email'],$o['payer_email'])!==0)query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$d['email'],'Your personal NATCON 2026 ticket',"Assalamu alaykum {$d['name']},\nYour ticket: ".$c['base_url'].'/conference/ticket.php#'.$d['ticket_token']."\nKeep this link private.",'pending',now()]);
+}
+function recover(\PDO $db,array $c,string $email): void {
+    $orders=query($db,"SELECT * FROM natcon_orders WHERE payer_email=? AND status IN ('pending','awaiting_review','paid')",[$email])->fetchAll();
+    foreach($orders as $o){
+        if($o['status']==='paid'){queueTickets($db,$c,$o['reference']);continue;}
+        query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$email,'Your NATCON registration link',"Continue your registration securely: ".$c['base_url'].'/conference/#reference='.$o['reference'].'&token='.$o['access_token'],'pending',now()]);
+    }
+    // Delegates can recover their own paid ticket without receiving their group payer's credentials.
+    foreach(query($db,"SELECT d.name,d.ticket_token FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE d.email=? AND o.payer_email<>? AND o.status='paid'",[$email,$email])->fetchAll() as $d)query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$email,'Your personal NATCON ticket',$c['base_url'].'/conference/ticket.php#'.$d['ticket_token'],'pending',now()]);
+}
+function confirmPayment(\PDO $db,array $c,string $ref,array $payment,string $actor='paystack',?array $receipt=null): bool {
+    $db->beginTransaction();try {
+        $o=query($db,'SELECT * FROM natcon_orders WHERE reference=?',[$ref])->fetch();
+        if(!$o || ($payment['status']??'')!=='success' || (string)($payment['reference']??'')!==$ref || (int)($payment['amount']??0)!==(int)$o['amount_kobo'] || ($payment['currency']??'')!==$o['currency'])throw new \InvalidArgumentException('Payment does not match this registration.');
+        if(!in_array($o['status'],['pending','awaiting_review','paid'],true))throw new \InvalidArgumentException('This registration cannot receive payment.');
+        if($receipt!==null && $o['status']!=='paid'){
+            if($o['status']!=='awaiting_review'||(int)($receipt['amount_kobo']??0)!==(int)$o['amount_kobo'])throw new \InvalidArgumentException('Verified bank amount does not match the registration total.');
+            $bankRef=strtoupper(trim((string)$o['bank_reference']));
+            if(!$bankRef)throw new \InvalidArgumentException('Missing bank transaction reference.');
+            try{query($db,'INSERT INTO natcon_transfer_receipts(bank_reference,reference,amount_kobo,staff_id,verified_at) VALUES(?,?,?,?,?)',[$bankRef,$ref,$o['amount_kobo'],(int)$actor,now()]);}
+            catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('This bank transaction has already been reconciled.');throw $e;}
+        }
+        $changed=query($db,"UPDATE natcon_orders SET status='paid',paid_at=? WHERE reference=? AND status IN ('pending','awaiting_review')",[now(),$ref])->rowCount()>0;
+        if($changed){queueTickets($db,$c,$ref);audit($db,$actor,'payment_confirmed',$ref,['amount_kobo'=>$o['amount_kobo']]);}
+        $db->commit();return $changed;
+    }catch(\Throwable $e){$db->rollBack();throw $e;}
+}
+function gateway(array $c,string $path,?array $body=null): array {
+    if(!$c['secret'])throw new \RuntimeException('Online payment is not configured. Use bank transfer or contact the organizers.');
+    $h=curl_init('https://api.paystack.co/'.$path);curl_setopt_array($h,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_TIMEOUT=>25,CURLOPT_HTTPHEADER=>['Authorization: Bearer '.$c['secret'],'Content-Type: application/json'],CURLOPT_SSL_VERIFYPEER=>true]);
+    if($body!==null)curl_setopt_array($h,[CURLOPT_POST=>true,CURLOPT_POSTFIELDS=>json_encode($body)]);
+    $raw=curl_exec($h);$status=curl_getinfo($h,CURLINFO_RESPONSE_CODE);curl_close($h);$result=json_decode((string)$raw,true);
+    if($status!==200 || !is_array($result) || empty($result['status']))throw new \RuntimeException('Payment provider could not complete the request. Please retry.');return $result['data'];
+}
+function delegate(\PDO $db,string $token): array {
+    $d=query($db,"SELECT d.*,o.status,o.payer_name,o.amount_kobo FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE d.ticket_token=?",[$token])->fetch();
+    if(!$d||$d['status']!=='paid')throw new \InvalidArgumentException('Ticket is invalid or payment is not confirmed.');return $d;
+}
+function checkin(\PDO $db,array $c,string $token,string $mode,int $staff,?string $date=null): array {
+    $date=$date??(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');
+    if($date<$c['start_date']||$date>$c['end_date'])throw new \InvalidArgumentException('Check-in is available only during October 1–4, 2026.');
+    if(!in_array($mode,['arrival','daily','reentry'],true))throw new \InvalidArgumentException('Choose arrival, daily, or reentry.');
+    $d=delegate($db,$token);$slot=$mode==='arrival'?'arrival':($mode==='daily'?'daily:'.$date:'reentry:'.bin2hex(random_bytes(12)));$at=now();
+    if($mode==='reentry'&&!query($db,'SELECT id FROM natcon_checkins WHERE delegate_id=? LIMIT 1',[$d['id']])->fetch())throw new \InvalidArgumentException('Record initial arrival before re-entry.');
+    try{query($db,'INSERT INTO natcon_checkins(delegate_id,slot,staff_id,checked_at) VALUES(?,?,?,?)',[$d['id'],$slot,$staff,$at]);$result='accepted';audit($db,(string)$staff,'checkin',$d['reference'],['delegate_id'=>$d['id'],'mode'=>$mode]);}
+    catch(\PDOException $e){if(!in_array((string)$e->getCode(),['23000','23505'],true))throw $e;$result='already_checked_in';$at=query($db,'SELECT checked_at FROM natcon_checkins WHERE delegate_id=? AND slot=?',[$d['id'],$slot])->fetchColumn();}
+    return ['result'=>$result,'delegate'=>$d,'checked_at'=>$at];
+}
+function limit(\PDO $db,string $key,int $max=15,int $seconds=300): void {
+    $key=hash('sha256',$key);$t=time();
+    $db->beginTransaction();try {
+        $insert=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INSERT OR IGNORE':'INSERT IGNORE';query($db,"$insert INTO natcon_limits(bucket,count,window_start) VALUES(?,0,?)",[$key,$t]);
+        query($db,'UPDATE natcon_limits SET count=0,window_start=? WHERE bucket=? AND window_start<?',[$t,$key,$t-$seconds]);
+        query($db,'UPDATE natcon_limits SET count=count+1 WHERE bucket=?',[$key]);$n=query($db,'SELECT count FROM natcon_limits WHERE bucket=?',[$key])->fetchColumn();$db->commit();
+    }catch(\Throwable $e){$db->rollBack();throw $e;}if($n>$max)throw new \InvalidArgumentException('Too many attempts. Please wait a few minutes.');
+}
