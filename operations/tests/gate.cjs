@@ -20,6 +20,9 @@ const cases = {
   'camera is stopped when hidden': js.includes("document.addEventListener('visibilitychange'") && js.includes('stopCamera'),
   'untrusted delegate strings use DOM text nodes': js.includes("detailCell(delegate.name") && js.includes("document.createElement(tag)"),
   'staff register shows course institution status and NATCON history': js.includes('delegate.course') && js.includes('delegate.institution') && js.includes('delegate.level') && js.includes('delegate.times_attended'),
+  'payout records share paid revenue, reservations, and available balance': html.includes('id="payout-revenue"') && html.includes('id="payout-reserved"') && html.includes('id="payout-available"') && js.includes("api.request('payouts')"),
+  'only Admin can request and only Finance can review payouts': html.includes('id="payout-request-form"') && html.includes('data-admin') && js.includes("user.role === 'finance'") && js.includes("api.request('request_payout'") && js.includes("api.request('review_payout'"),
+  'recording a payout as paid asks for manual transfer reference': js.includes("status === 'paid' ? 'Bank transfer reference") && js.includes('payoutReviewStatus === \'paid\' ? 8 : 4'),
 };
 
 for (const [name, passed] of Object.entries(cases)) {

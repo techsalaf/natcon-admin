@@ -10,6 +10,9 @@ const flows = {
   'finance cancellation is separate from payment': source.includes("api.request('cancel'"),
   'ticket allocation is recorded server-side': source.includes("api.request('entitlement'"),
   'staff session is recovered from server': source.includes("api.request('session')"),
+  'payout balance is fetched from shared NATCON operations API': source.includes("api.request('payouts')") && source.includes('payout-available'),
+  'admin payout requests and Finance review use role-specific routes': source.includes("user.role === 'finance'") && source.includes("api.request('request_payout'") && source.includes("api.request('review_payout'"),
+  'completed payout records manual reference without an app transfer': source.includes("status === 'paid' ? 'Bank transfer reference") && !source.includes('transferToBank'),
 };
 const passed = Object.values(flows).filter(Boolean).length;
 for (const [flow, result] of Object.entries(flows)) console.log(`${result ? 'PASS' : 'FAIL'} ${flow}`);

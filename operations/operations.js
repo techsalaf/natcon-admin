@@ -4,9 +4,9 @@
   const api = new C.Api('../api/natcon.php', window.fetch.bind(window));
   const $ = (id) => document.getElementById(id);
   let user = null, activeView = 'overview', stream = null, scanTimer = null;
-  let scanning = false, checking = false, selectedToken = '', approvalReference = '', cancelReference = '', noticeTimer;
+  let scanning = false, checking = false, selectedToken = '', approvalReference = '', cancelReference = '', payoutReviewId = '', payoutReviewStatus = '', noticeTimer;
   let delegateRequest = 0;
-  const titles = { overview: 'Conference overview', delegates: 'Delegate register', scanner: 'Welcome desk', transfers: 'Bank transfers' };
+  const titles = { overview: 'Conference overview', delegates: 'Delegate register', scanner: 'Welcome desk', transfers: 'Bank transfers', payouts: 'Payouts' };
   function node(tag, text, className) {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
@@ -26,7 +26,7 @@
   function signedOut() {
     stopCamera(); user = null; selectedToken = ''; api.csrf = ''; delegateRequest++;
     $('app').hidden = true; $('login-view').hidden = false; $('loading').hidden = true;
-    $('approve-dialog').close(); $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren();
+    $('approve-dialog').close(); $('payout-review-dialog').close(); $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren(); $('payout-list').replaceChildren();
     $('scan-result').replaceChildren(node('h2', 'Waiting for a ticket')); $('logistics').hidden = true;
     $('email').focus();
   }
@@ -38,12 +38,13 @@
     user = session.user; $('staff-name').textContent = user.name; $('staff-role').textContent = user.role;
     $('staff-avatar').textContent = String(user.name || 'T').substring(0, 1).toUpperCase();
     document.querySelectorAll('[data-finance]').forEach((item) => { item.hidden = !C.canFinance(user); });
+    document.querySelectorAll('[data-admin]').forEach((item) => { item.hidden = user.role !== 'admin'; });
     document.querySelectorAll('[data-view="scanner"], [data-go="scanner"]').forEach((item) => { item.hidden = !C.canCheckin(user); });
     $('login-view').hidden = true; $('app').hidden = false; $('loading').hidden = true; $('password').value = '';
     await changeView('overview');
   }
   async function changeView(view) {
-    if (!titles[view] || (view === 'transfers' && !C.canFinance(user)) || (view === 'scanner' && !C.canCheckin(user))) return;
+    if (!titles[view] || (['transfers', 'payouts'].includes(view) && !C.canFinance(user)) || (view === 'scanner' && !C.canCheckin(user))) return;
     if (view !== 'scanner') stopCamera();
     activeView = view; $('page-error').hidden = true; $('page-title').textContent = titles[view];
     document.querySelectorAll('.view').forEach((section) => { section.hidden = section.id !== 'view-' + view; });
@@ -57,6 +58,7 @@
     if (activeView === 'overview') await loadDashboard();
     if (activeView === 'delegates') await loadDelegates();
     if (activeView === 'transfers') await loadTransfers();
+    if (activeView === 'payouts') await loadPayouts();
   }
   async function loadDashboard() {
     const data = await api.request('dashboard');
@@ -139,6 +141,42 @@
         $('approve-form').reset(); $('approve-error').hidden = true; $('approve-dialog').showModal(); $('reconciliation-note').focus();
       }); right.append(review); card.append(info, right); $('transfer-list').append(card);
     });
+  }
+  async function loadPayouts() {
+    const data = await api.request('payouts');
+    if (!user) return;
+    const balance = data.balance || {};
+    $('payout-revenue').textContent = C.money(balance.revenue_kobo);
+    $('payout-reserved').textContent = C.money(balance.reserved_kobo);
+    $('payout-available').textContent = C.money(balance.available_kobo);
+    const rows = data.items || [];
+    $('payout-list').replaceChildren(); $('payout-count').textContent = rows.length + ' request(s)'; $('payout-empty').hidden = rows.length > 0;
+    rows.forEach((payout) => {
+      const card = node('article', undefined, 'transfer-card'), info = node('div'), right = node('div', undefined, 'transfer-right');
+      info.append(node('h3', payout.requester || 'Admin request'));
+      info.append(node('p', 'Requested ' + C.dateTime(payout.r_date)));
+      info.append(node('p', payout.r_type + ' · ' + (payout.bank_name || '')));
+      info.append(node('p', (payout.acc_name || '') + ' · ' + (payout.acc_number || '')));
+      if (payout.note) info.append(node('p', 'Request note: ' + payout.note));
+      const status = node('span', payout.status, 'status ' + (payout.status === 'rejected' ? 'cancelled' : payout.status === 'paid' ? 'paid' : 'pending'));
+      info.append(status); right.append(node('p', C.money(payout.amount_kobo), 'amount'));
+      if (user.role === 'finance' && payout.status === 'pending') {
+        const approve = node('button', 'Approve', 'primary'); approve.addEventListener('click', () => openPayoutReview(payout, 'approved')); right.append(approve);
+        const reject = node('button', 'Reject', 'secondary'); reject.addEventListener('click', () => openPayoutReview(payout, 'rejected')); right.append(reject);
+      }
+      if (user.role === 'finance' && payout.status === 'approved') {
+        const paid = node('button', 'Record transfer paid', 'primary'); paid.addEventListener('click', () => openPayoutReview(payout, 'paid')); right.append(paid);
+      }
+      card.append(info, right); $('payout-list').append(card);
+    });
+  }
+  function openPayoutReview(payout, status) {
+    payoutReviewId = payout.payout_id; payoutReviewStatus = status;
+    $('payout-review-title').textContent = status === 'paid' ? 'Record manual transfer' : status[0].toUpperCase() + status.slice(1) + ' payout';
+    $('payout-review-details').textContent = payout.requester + ' · ' + C.money(payout.amount_kobo) + ' · ' + payout.bank_name + ' · ' + payout.acc_number;
+    $('payout-review-note').value = ''; $('payout-review-note').minLength = status === 'paid' ? 8 : 4;
+    $('payout-review-note').placeholder = status === 'paid' ? 'Bank transfer reference (at least 8 characters) and note' : 'Reason for the decision';
+    $('payout-review-error').hidden = true; $('payout-review-dialog').showModal(); $('payout-review-note').focus();
   }
   function stopCamera() {
     scanning = false; clearTimeout(scanTimer);
@@ -266,6 +304,28 @@
         await api.request('cancel', { reference: cancelReference, status: $('cancel-status').value, reason });
         $('cancel-dialog').close(); notify('Order status updated. Tickets for this order are no longer valid.'); await loadDelegates();
       } catch (error) { if (error.status === 401) handleError(error); else showError('cancel-error', error); }
+    });
+  });
+  $('payout-request-form').addEventListener('submit', (event) => {
+    event.preventDefault(); $('payout-request-error').hidden = true;
+    busy(event.submitter || $('payout-request-form').querySelector('button[type="submit"]'), async () => {
+      try {
+        const amount = $('payout-amount').value.trim(); C.nairaToKobo(amount);
+        await api.request('request_payout', { amount, r_type: 'BANK Transfer', bank_name: $('payout-bank').value.trim(), acc_name: $('payout-account-name').value.trim(), acc_number: $('payout-account-number').value.trim() });
+        $('payout-request-form').reset(); notify('Payout request sent to Finance for review.'); await loadPayouts();
+      } catch (error) { if (error.status === 401) handleError(error); else showError('payout-request-error', error); }
+    });
+  });
+  $('close-payout-review').addEventListener('click', () => $('payout-review-dialog').close());
+  $('payout-review-form').addEventListener('submit', (event) => {
+    event.preventDefault(); $('payout-review-error').hidden = true;
+    busy(event.submitter || $('payout-review-form').querySelector('button[type="submit"]'), async () => {
+      try {
+        const note = $('payout-review-note').value.trim();
+        if (note.length < (payoutReviewStatus === 'paid' ? 8 : 4)) throw new Error(payoutReviewStatus === 'paid' ? 'Include the bank transfer reference.' : 'Enter a review note.');
+        await api.request('review_payout', { payout_id: payoutReviewId, status: payoutReviewStatus, note });
+        $('payout-review-dialog').close(); notify('Payout request updated.'); await loadPayouts();
+      } catch (error) { if (error.status === 401) handleError(error); else showError('payout-review-error', error); }
     });
   });
   $('export').addEventListener('click', (event) => busy(event.currentTarget, async () => {
