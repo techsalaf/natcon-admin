@@ -90,4 +90,5 @@ $againPayment=['status'=>'success','reference'=>$again['reference'],'amount'=>(i
 rejects(fn()=>confirmPayment($db,$c,$again['reference'],$againPayment,'1',['amount_kobo'=>(int)$again['amount_kobo']]),'Reject reused bank transaction');
 recover($db,$c,'transfer@example.test');
 check((int)query($db,"SELECT COUNT(*) FROM natcon_outbox WHERE recipient='transfer@example.test'")->fetchColumn()>=2,'Paid ticket recovery is queued');
+$webEvent=event($c,$db,$futureEventId);check($webEvent['event_id']===(int)$futureEventId&&$webEvent['ticket_types'][0]['typeid']===$futureType['typeid']&&$webEvent['price_kobo']===250000,'Public web event details expose selected catalogue event and ticket types');
 echo "PASS $checks backend gate assertions\n";

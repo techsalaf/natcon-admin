@@ -16,7 +16,9 @@ const cases={
   'no invented programme times':html.includes('Detailed session times will be announced'),
   'ticket print offered':ticket.includes('window.print()'),
   'delegate profile collects requested fields':['email','course','institution','level','whatsapp','calling_line','state_origin','times_attended'].every(field=>js.includes(`data-field="${field}"`)),
-  'graduate and NYSC statuses available':js.includes('Graduate')&&js.includes('NYSC Corp Member')&&js.includes('Masters')
+  'graduate and NYSC statuses available':js.includes('Graduate')&&js.includes('NYSC Corp Member')&&js.includes('Masters'),
+  'published events and ticket types are selectable from canonical catalogue':js.includes("api('public_events',{},'GET')")&&js.includes("api('event',{event_id:eventId},'GET')")&&js.includes('event.ticket_types'),
+  'web checkout submits selected event and ticket type ids':js.includes('data.event_id = String(event.event_id)')&&js.includes('data.ticket_type_id = selectedTicketTypeId')
 };
 for(const [name,pass] of Object.entries(cases))console.log(`${pass?'PASS':'FAIL'} ${name}`);
 const score=Object.values(cases).filter(Boolean).length;

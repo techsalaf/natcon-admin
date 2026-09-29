@@ -393,8 +393,8 @@ function audit(\PDO $db,string $actor,string $action,string $reference='',array 
 function event(array $c,?\PDO $db=null,?string $eventId=null): array {
     $base=array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']));
     if(!$db){$date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return $base+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!==''];}
-    $selected=$eventId===null?primaryConference($db):query($db,'SELECT * FROM natcon_events WHERE id=?',[(int)$eventId])->fetch();if(!$selected)throw new \InvalidArgumentException('NATCON event not found.');$type=query($db,"SELECT price_kobo FROM natcon_ticket_types WHERE event_id=? AND status='active' AND (sales_start IS NULL OR sales_start<=?) AND (sales_end IS NULL OR sales_end>=?) ORDER BY price_kobo,id LIMIT 1",[$selected['id'],now(),now()])->fetchColumn();
-    return array_replace($base,['event_id'=>(int)$selected['id'],'name'=>$selected['title'],'theme'=>$selected['description'],'start_date'=>substr((string)$selected['starts_at'],0,10),'end_date'=>substr((string)$selected['ends_at'],0,10),'venue'=>$selected['venue'],'currency'=>$selected['currency'],'price_kobo'=>(int)($type?:0),'payment_enabled'=>$c['secret']!=='']);
+    $selected=$eventId===null?primaryConference($db):publishedEvent($db,$eventId);$types=mobileTicketTypes($db,$c,(string)$selected['id']);$type=$types[0]??null;
+    return array_replace($base,['event_id'=>(int)$selected['id'],'name'=>$selected['title'],'theme'=>$selected['description'],'start_date'=>substr((string)$selected['starts_at'],0,10),'end_date'=>substr((string)$selected['ends_at'],0,10),'venue'=>$selected['venue'],'currency'=>$selected['currency'],'price_kobo'=>(int)round((float)($type['ticket_price']??0)*100),'ticket_types'=>$types,'payment_enabled'=>$c['secret']!=='']);
 }
 function order(\PDO $db,string $reference,string $token): array {
     $o=query($db,'SELECT * FROM natcon_orders WHERE reference=? AND access_token=?',[$reference,$token])->fetch();

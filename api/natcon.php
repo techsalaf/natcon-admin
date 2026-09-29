@@ -9,10 +9,10 @@ function respond($data): never {echo json_encode(['ok'=>true,'data'=>$data],JSON
 function requireStaff(array $roles): array {global $db;$user=$_SESSION['user']??null;if(!$user)$user=staffForToken($db);if(!$user||(!isset($user['token_id'])&&($_SESSION['last_active']??0)<time()-3600)){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if(!in_array($user['role'],$roles,true)){http_response_code(403);throw new InvalidArgumentException('Your role cannot perform this action.');}if(!isset($user['token_id']))$_SESSION['last_active']=time();return $user;}
 try {
     $c=config();$action=clean($_GET['action']??'event',50);$method=$_SERVER['REQUEST_METHOD'];
-    $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db));
+    $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db,isset($_GET['event_id'])?clean($_GET['event_id'],32):null));if($action==='public_events'&&$method==='GET')respond(\Natcon\mobileEventCards($db));
     $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue'];
+    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue','public_events'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
     elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
     elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
