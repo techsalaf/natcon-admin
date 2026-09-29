@@ -64,6 +64,7 @@
   }
   async function loadCatalogue() {
     catalogue = await api.request('event_catalogue');
+    catalogue.coupons = await api.request('coupons');
     $('event-list').replaceChildren(); $('event-empty').hidden = catalogue.events.length > 0;
     catalogue.events.forEach((event) => {
       const card = node('article', undefined, 'transfer-card'), info = node('div'), actions = node('div', undefined, 'transfer-right');
@@ -83,6 +84,19 @@
       const row = document.createElement('tr'); row.append(detailCell(ticket.type, ticket.description), detailCell(ticket.event_title), detailCell(C.money(Math.round(Number(ticket.price) * 100))), detailCell(ticket.tlimit === '0' ? 'Unlimited' : ticket.tlimit), detailCell(ticket.status === '1' ? 'Active' : 'Inactive'));
       const actionCell = node('td'), edit = node('button', 'Edit', 'text-button'); edit.addEventListener('click', () => openTicketEditor(ticket)); actionCell.append(edit); row.append(actionCell); $('ticket-type-rows').append(row);
     });
+    $('coupon-event').replaceChildren(); $('coupon-event').add(new Option('Select event', ''));
+    catalogue.events.forEach((event) => $('coupon-event').add(new Option(event.event_title,event.event_id)));
+    $('coupon-rows').replaceChildren(); $('coupon-empty').hidden = catalogue.coupons.length > 0;
+    catalogue.coupons.forEach((coupon) => {
+      const row=document.createElement('tr'), discount=coupon.discount_type==='percent'?`${coupon.coupon_val}%`:C.money(Math.round(Number(coupon.coupon_val)*100));
+      row.append(detailCell(coupon.coupon_code,coupon.title),detailCell(coupon.event_title),detailCell(discount),detailCell(C.money(Math.round(Number(coupon.min_amt)*100))),detailCell(coupon.expire_date),detailCell(coupon.status==='1'?'Active':'Inactive'));
+      const action=node('td'),edit=node('button','Edit','text-button');edit.addEventListener('click',()=>openCouponEditor(coupon));action.append(edit);row.append(action);$('coupon-rows').append(row);
+    });
+  }
+  function openCouponEditor(coupon) {
+    $('coupon-form').reset();$('coupon-error').hidden=true;$('coupon-title').textContent=coupon?'Edit coupon':'Create coupon';$('coupon-id').value=coupon?.id||'';
+    $('coupon-event').value=coupon?.event_id||catalogue.events.find(event=>event.event_status==='published')?.event_id||'';$('coupon-code').value=coupon?.coupon_code||'';$('coupon-code').readOnly=!!coupon;
+    $('coupon-name').value=coupon?.title||'';$('coupon-subtitle').value=coupon?.subtitle||'';$('coupon-description').value=coupon?.description||'';$('coupon-type').value=coupon?.discount_type||'fixed';$('coupon-value').value=coupon?.coupon_val||'';$('coupon-minimum').value=coupon?.min_amt||'0';$('coupon-expiry').value=coupon?.expire_date||'';$('coupon-limit').value=coupon?.usage_limit??0;$('coupon-status').value=coupon?.status||'1';$('coupon-dialog').showModal();$('coupon-code').focus();
   }
   async function updateEventStatus(event, statusAction) {
     const verb=statusAction==='cancel'?'cancel':'mark completed';
@@ -377,6 +391,10 @@
     });
   });
   $('new-event').addEventListener('click', () => openEventEditor(null));
+  $('new-coupon').addEventListener('click',()=>openCouponEditor(null));
+  $('close-coupon').addEventListener('click',()=>$('coupon-dialog').close());
+  $('coupon-type').addEventListener('change',()=>{$('coupon-value').step=$('coupon-type').value==='percent'?'1':'0.01';$('coupon-value').max=$('coupon-type').value==='percent'?'100':'';});
+  $('coupon-form').addEventListener('submit',async(event)=>{event.preventDefault();$('coupon-error').hidden=true;try{await api.request('save_coupon',{coupon_id:$('coupon-id').value||null,event_id:$('coupon-event').value,coupon_code:$('coupon-code').value.trim(),title:$('coupon-name').value.trim(),subtitle:$('coupon-subtitle').value.trim(),description:$('coupon-description').value.trim(),discount_type:$('coupon-type').value,coupon_val:$('coupon-value').value.trim(),min_amt:$('coupon-minimum').value.trim(),expire_date:$('coupon-expiry').value,usage_limit:$('coupon-limit').value,status:$('coupon-status').value});$('coupon-dialog').close();notify('Coupon saved to the shared NATCON catalogue.');await loadCatalogue();}catch(error){if(error.status===401)handleError(error);else showError('coupon-error',error);}});
   $('close-event').addEventListener('click', () => $('event-dialog').close());
   $('event-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('event-error').hidden = true;

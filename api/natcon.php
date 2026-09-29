@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,organizerEvents,organizerCategories,organizerTicketTypes,saveOrganizerEvent,saveOrganizerTicketType,setOrganizerEventStatus};
+use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,organizerEvents,organizerCategories,organizerTicketTypes,saveOrganizerEvent,saveOrganizerTicketType,setOrganizerEventStatus,organizerCoupons,saveOrganizerCoupon};
 header('X-Content-Type-Options: nosniff');header('Cache-Control: no-store');header('Content-Type: application/json; charset=utf-8');
 ini_set('session.use_strict_mode', '1');
 session_name('natcon_staff');session_set_cookie_params(['httponly'=>true,'secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','samesite'=>'Strict','path'=>'/']);session_start();
@@ -12,7 +12,7 @@ try {
     $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db,isset($_GET['event_id'])?clean($_GET['event_id'],32):null));if($action==='public_events'&&$method==='GET')respond(\Natcon\mobileEventCards($db));
     $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue','public_events'];
+    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue','public_events','coupons'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
     elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
     elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
@@ -70,6 +70,8 @@ try {
         requireStaff(['admin']);$events=organizerEvents($db);$types=organizerTicketTypes($db);
         respond(['events'=>$events,'categories'=>organizerCategories($db),'ticket_types'=>$types]);
     }
+    if($action==='coupons'){requireStaff(['admin']);respond(organizerCoupons($db,clean($_GET['event_id']??'',32)));}
+    if($action==='save_coupon'){$user=requireStaff(['admin']);$in['_staff_id']=(int)$user['id'];$id=filter_var($in['coupon_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);if(!empty($in['coupon_id'])&&!$id)throw new InvalidArgumentException('Choose a valid coupon.');respond(saveOrganizerCoupon($db,$in,$id?:null));}
     if($action==='save_event'){
         $user=requireStaff(['admin']);$in['_staff_id']=(int)$user['id'];$id=filter_var($in['event_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if(!empty($in['event_id'])&&!$id)throw new InvalidArgumentException('Choose a valid NATCON event.');

@@ -156,6 +156,16 @@ try {
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if($staff['role']!=='finance')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Finance can review payout requests.'],403);
         $result=\Natcon\reviewPayout($db,(int)$staff['id'],(int)($in['payout_id']??0),clean($in['status']??'',20),clean($in['note']??'',1000));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout request updated.','data'=>$result]);
     }
+    if($client==='orag_api'&&in_array($endpoint,['coupon_list.php','add_coupon.php','update_coupon.php'],true)){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        if($endpoint==='coupon_list.php'){
+            if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view coupons.'],403);
+            mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Coupons loaded.','coupondata'=>\Natcon\organizerCoupons($db,clean($in['event_id']??'',32))]);
+        }
+        if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can manage NATCON coupons.'],403);
+        $in['_staff_id']=(int)$staff['id'];$id=$endpoint==='update_coupon.php'?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;if($endpoint==='update_coupon.php'&&!$id)throw new InvalidArgumentException('Choose a valid coupon.');
+        $saved=\Natcon\saveOrganizerCoupon($db,$in,$id?:null);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>$endpoint==='add_coupon.php'?'Coupon added to the NATCON catalogue.':'Coupon updated.','data'=>$saved]);
+    }
     if($client==='orag_api'&&in_array($endpoint,['list_category.php','list_type.php','add_event.php','edit_event.php','add_type.php','edit_type.php','complete_event.php','cancle_event.php'],true)){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         if($endpoint==='list_category.php'){
