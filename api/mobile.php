@@ -40,6 +40,19 @@ try {
         $exists=(bool)query($db,'SELECT id FROM natcon_accounts WHERE country_code=? AND phone=?',[$country,$phone])->fetchColumn();
         mobileReply(['Result'=>$exists?'false':'true','ResponseMsg'=>$exists?'Phone number already has an account.':'Phone number is available.']);
     }
+    if($client==='user_api'&&$endpoint==='u_forget_password.php'){
+        limit($db,'mobile-password-reset:'.($_SERVER['REMOTE_ADDR']??''),12,300);
+        $stage=clean($in['stage']??'',20);$email=strtolower(clean($in['email']??'',190));
+        if($stage==='request'){
+            \Natcon\requestAccountPasswordReset($db,$email);
+            mobileReply(['Result'=>'true','ResponseMsg'=>'If an active NATCON account uses that email, a reset code will be sent shortly.']);
+        }
+        if($stage==='confirm'){
+            \Natcon\resetAccountPassword($db,$email,clean($in['code']??'',6),(string)($in['password']??''));
+            mobileReply(['Result'=>'true','ResponseMsg'=>'Your password was reset. Sign in with your new password.']);
+        }
+        mobileReply(['Result'=>'false','ResponseMsg'=>'Choose a password reset step.'],400);
+    }
     if($client==='user_api'&&$endpoint==='u_home_data.php'){
         $account=accountForToken($db);$canonical=\Natcon\event($c,$db);$card=mobileEventCard($db,$c);$today=(new DateTimeImmutable('now',new DateTimeZone('Africa/Lagos')))->format('Y-m-d');$open=$today<=$canonical['end_date'];
         $wallet=$account?(int)$account['wallet_balance_kobo']/100:0;

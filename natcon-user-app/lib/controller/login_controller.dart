@@ -10,7 +10,6 @@ import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
-import '../screen/LoginAndSignup/login_screen.dart';
 import '../screen/bottombar_screen.dart';
 import '../utils/Custom_widget.dart';
 import 'package:magicmate_user/Api/natcon_http.dart';
@@ -36,6 +35,7 @@ class LoginController extends GetxController implements GetxService {
 
   String forgetPasswprdResult = "";
   String forgetMsg = "";
+  bool passwordResetLoading = false;
 
   changeIndex(int index) {
     selectedIndex = index;
@@ -128,29 +128,49 @@ class LoginController extends GetxController implements GetxService {
     String? mobile,
     String? ccode,
   }) async {
+    // Password changes now require a server-issued, email-delivered reset code.
+    forgetPasswprdResult = "false";
+    forgetMsg = "Use the email code reset flow to change your password.";
+    showToastMessage(forgetMsg);
+  }
+
+  Future<Map<String, dynamic>> requestNatconPasswordReset(String email) async {
+    passwordResetLoading = true;
+    update();
     try {
-      Map map = {
-        "mobile": mobile,
-        "ccode": ccode,
-        "password": newPassword.text,
-      };
-      Uri uri = Uri.parse(Config.baseurl + Config.forgetPassword);
-      var response = await NatconHttp.post(
-        uri,
-        body: jsonEncode(map),
+      final response = await NatconHttp.post(
+        Uri.parse(Config.baseurl + Config.forgetPassword),
+        body: jsonEncode({'stage': 'request', 'email': email.trim()}),
       );
-      if (response.statusCode == 200) {
-        var result = jsonDecode(response.body);
-        forgetPasswprdResult = result["Result"];
-        forgetMsg = result["ResponseMsg"];
-        if (forgetPasswprdResult == "true") {
-          save('isLoginBack', false);
-          Get.to(LoginScreen());
-          showToastMessage(forgetMsg);
-        }
-      }
-    } catch (e) {
-      print(e.toString());
+      final payload = jsonDecode(response.body);
+      return Map<String, dynamic>.from(payload as Map);
+    } catch (_) {
+      return {'Result': 'false', 'ResponseMsg': 'Could not request a reset code. Try again.'};
+    } finally {
+      passwordResetLoading = false;
+      update();
+    }
+  }
+
+  Future<Map<String, dynamic>> confirmNatconPasswordReset({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    passwordResetLoading = true;
+    update();
+    try {
+      final response = await NatconHttp.post(
+        Uri.parse(Config.baseurl + Config.forgetPassword),
+        body: jsonEncode({'stage': 'confirm', 'email': email.trim(), 'code': code.trim(), 'password': password}),
+      );
+      final payload = jsonDecode(response.body);
+      return Map<String, dynamic>.from(payload as Map);
+    } catch (_) {
+      return {'Result': 'false', 'ResponseMsg': 'Could not reset the password. Check the code and try again.'};
+    } finally {
+      passwordResetLoading = false;
+      update();
     }
   }
 

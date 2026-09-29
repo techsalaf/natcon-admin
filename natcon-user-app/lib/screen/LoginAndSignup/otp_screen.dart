@@ -271,7 +271,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               showToastMessage(signUpController.signUpMsg);
                             }
                             if (rout == "resetScreen") {
-                              forgetPasswordBottomSheet();
+                              Get.to(() => ResetPasswordScreen());
                             }
                           }else{
                            if(otpCode == code){
@@ -282,7 +282,7 @@ class _OtpScreenState extends State<OtpScreen> {
                                showToastMessage(signUpController.signUpMsg);
                              }
                              if (rout == "resetScreen") {
-                               forgetPasswordBottomSheet();
+                               Get.to(() => ResetPasswordScreen());
                              }
                            }else{
                              showToastMessage("Please enter your valid OTP".tr);
@@ -552,7 +552,18 @@ class _OtpScreenState extends State<OtpScreen> {
           showToastMessage(signUpController.signUpMsg);
         } else{
           if(smsType["SMS_TYPE"] == "Firebase"){
-            sendOTP(phoneNumber, countryCode);
+            auth.verifyPhoneNumber(
+              phoneNumber: '$countryCode$phoneNumber',
+              verificationCompleted: (_) {},
+              verificationFailed: (error) => showToastMessage(error.message ?? 'Could not resend the verification code.'),
+              codeSent: (verificationId, _) {
+                ResetPasswordScreen.verifay = verificationId;
+                showToastMessage('A new verification code was sent.');
+              },
+              codeAutoRetrievalTimeout: (verificationId) {
+                ResetPasswordScreen.verifay = verificationId;
+              },
+            );
           }else if (smsType["SMS_TYPE"] == "Msg91"){
             //  msg_otp;
             msgOtpController.msgOtpApi(mobile: "$countryCode${phoneNumber}").then((msgOtp) {
@@ -609,4 +620,3 @@ class _OtpScreenState extends State<OtpScreen> {
   }
 
 }
-

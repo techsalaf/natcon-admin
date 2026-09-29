@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -34,6 +35,25 @@ class _SignUpScreenState extends State<SignUpScreen> {
   SmsTypeController smsTypeController = Get.put(SmsTypeController());
   MsgOtpController msgOtpController = Get.put(MsgOtpController());
   TwilioOtpController twilioOtpController = Get.put(TwilioOtpController());
+
+  Future<void> sendOTP(String phone, String countryCode) async {
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: '$countryCode$phone',
+        verificationCompleted: (_) {},
+        verificationFailed: (error) => showToastMessage(error.message ?? 'Could not send the verification code.'),
+        codeSent: (verificationId, _) {
+          ResetPasswordScreen.verifay = verificationId;
+          showToastMessage('A verification code was sent.');
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          ResetPasswordScreen.verifay = verificationId;
+        },
+      );
+    } catch (_) {
+      showToastMessage('Could not send the verification code. Try again.');
+    }
+  }
 
   @override
   void initState() {
@@ -574,7 +594,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                            "number": signUpController.number.text,
                                            "cuntryCode": cuntryCode,
                                            "route": "signUpScreen",
-                                           "msgType": smsType["SMS_TYPE"].toString,
+                                           "msgType": smsType["SMS_TYPE"].toString(),
                                          });
                                        }else if (smsType["SMS_TYPE"] == "Msg91"){
                                          //  msg_otp;
@@ -585,7 +605,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                "cuntryCode": cuntryCode,
                                                "route": "signUpScreen",
                                                "otpCode": msgOtp["otp"].toString(),
-                                               "msgType": smsType["SMS_TYPE"].toString,
+                                               "msgType": smsType["SMS_TYPE"].toString(),
                                              });
                                              print("++++++++msgOtp+++++++++++ ${msgOtp["otp"]}");
                                            }else{
@@ -601,7 +621,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                                "cuntryCode": cuntryCode,
                                                "route": "signUpScreen",
                                                "otpCode": twilioOtp["otp"].toString(),
-                                               "msgType": smsType["SMS_TYPE"].toString,
+                                               "msgType": smsType["SMS_TYPE"].toString(),
                                              });
                                              print("++++++++twilioOtp+++++++++++ ${twilioOtp["otp"]}");
                                            }else{

@@ -105,6 +105,31 @@ function referralSummary(\PDO $db,int $accountId): array {
     $account=query($db,'SELECT referral_code FROM natcon_accounts WHERE id=?',[$accountId])->fetch();if(!$account)throw new \InvalidArgumentException('Attendee account is unavailable.');
     return ['code'=>$account['referral_code'],'signupcredit'=>'0.00','refercredit'=>'0.00','tracked'=>(int)query($db,'SELECT COUNT(*) FROM natcon_referrals WHERE referrer_account_id=?',[$accountId])->fetchColumn(),'converted'=>(int)query($db,"SELECT COUNT(*) FROM natcon_referrals WHERE referrer_account_id=? AND status='converted'",[$accountId])->fetchColumn()];
 }
+function requestAccountPasswordReset(\PDO $db,string $email): void {
+    $email=strtolower(clean($email,190));if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Enter a valid account email address.');
+    limit($db,'password-reset:'.hash('sha256',$email),3,3600);
+    $account=query($db,"SELECT id,name FROM natcon_accounts WHERE email=? AND status='active'",[$email])->fetch();
+    if(!$account)return;
+    $code=(string)random_int(100000,999999);$expires=(new \DateTimeImmutable('+15 minutes',new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    $db->beginTransaction();try{
+        query($db,"UPDATE natcon_otp_challenges SET consumed_at=? WHERE destination=? AND channel='password_reset' AND consumed_at IS NULL",[now(),$email]);
+        query($db,'INSERT INTO natcon_otp_challenges(destination,channel,code_hash,expires_at,attempts,created_at) VALUES(?,?,?,?,?,?)',[$email,'password_reset',password_hash($code,PASSWORD_DEFAULT),$expires,0,now()]);
+        $body="Assalamu alaykum {$account['name']},\n\nYour NATCON password reset code is {$code}. It expires in 15 minutes and can be used once. If you did not request this, ignore this email.";
+        query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$email,'NATCON password reset code',$body,'pending',now()]);$db->commit();
+    }catch(\Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
+function resetAccountPassword(\PDO $db,string $email,string $code,string $password): void {
+    $email=strtolower(clean($email,190));$code=clean($code,6);
+    if(!filter_var($email,FILTER_VALIDATE_EMAIL)||!preg_match('/^[0-9]{6}$/',$code)||strlen($password)<8||strlen($password)>128)throw new \InvalidArgumentException('Enter the email code and a password of at least 8 characters.');
+    $db->beginTransaction();try{
+        $challenge=query($db,"SELECT id,code_hash,expires_at,attempts FROM natcon_otp_challenges WHERE destination=? AND channel='password_reset' AND consumed_at IS NULL ORDER BY id DESC LIMIT 1",[$email])->fetch();
+        $account=query($db,"SELECT id FROM natcon_accounts WHERE email=? AND status='active'",[$email])->fetch();
+        if(!$challenge||!$account||(int)$challenge['attempts']>=5||$challenge['expires_at']<now())throw new \InvalidArgumentException('The code is invalid or expired. Request a new code.');
+        if(!password_verify($code,$challenge['code_hash'])){query($db,'UPDATE natcon_otp_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5',[$challenge['id']]);$db->commit();throw new \InvalidArgumentException('The code is invalid or expired. Request a new code.');}
+        $consumed=query($db,"UPDATE natcon_otp_challenges SET consumed_at=?,attempts=attempts+1 WHERE id=? AND consumed_at IS NULL AND attempts<5",[now(),$challenge['id']]);if($consumed->rowCount()!==1)throw new \InvalidArgumentException('The code has already been used. Request a new code.');
+        query($db,'UPDATE natcon_accounts SET password_hash=?,updated_at=? WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),now(),$account['id']]);query($db,"UPDATE natcon_mobile_tokens SET revoked_at=? WHERE principal_type='attendee' AND principal_id=? AND revoked_at IS NULL",[now(),$account['id']]);audit($db,'account:'.$account['id'],'password_reset',$email);$db->commit();
+    }catch(\Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
 function markReferralConverted(\PDO $db,int $accountId): bool {
     if($accountId<1)return false;
     return query($db,"UPDATE natcon_referrals SET status='converted' WHERE referred_account_id=? AND status='pending'",[$accountId])->rowCount()>0;

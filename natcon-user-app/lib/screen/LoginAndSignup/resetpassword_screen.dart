@@ -1,579 +1,166 @@
-// ignore_for_file: prefer_const_constructors, must_be_immutable, use_key_in_widget_constructors, unnecessary_string_interpolations, sort_child_properties_last
-
-import 'dart:convert';
-
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
 
 import '../../controller/login_controller.dart';
-import '../../controller/msg_otp_controller.dart';
-import '../../controller/signup_controller.dart';
-import '../../controller/sms_type_controller.dart';
-import '../../controller/twillio_otp_controller.dart';
-import '../../helpar/routes_helpar.dart';
-import '../../model/fontfamily_model.dart';
-import '../../utils/Colors.dart';
-import '../../utils/Custom_widget.dart';
 import 'login_screen.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
-  static String verifay = "";
+  static String verifay = '';
+
+  const ResetPasswordScreen({super.key});
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
-  SignUpController signUpController = Get.find();
-
-  TextEditingController number = TextEditingController();
-
-  String cuntryCode = "";
-
   final _formKey = GlobalKey<FormState>();
-  SmsTypeController smsTypeController = Get.put(SmsTypeController());
-  MsgOtpController msgOtpController = Get.put(MsgOtpController());
-  TwilioOtpController twilioOtpController = Get.put(TwilioOtpController());
-  LoginController loginController = Get.put(LoginController());
+  final _email = TextEditingController();
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  final _controller = Get.put(LoginController());
+  bool _codeSent = false;
+  bool _hidePassword = true;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _code.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  Future<void> _requestCode() async {
+    if (!_formKey.currentState!.validate()) return;
+    final result = await _controller.requestNatconPasswordReset(_email.text);
+    if (!mounted) return;
+    if (result['Result'] == 'true') {
+      setState(() => _codeSent = true);
+      Get.snackbar('Check your email', result['ResponseMsg'] ?? 'If this account exists, a code is on its way.');
+    } else {
+      Get.snackbar('Could not send code', result['ResponseMsg'] ?? 'Try again shortly.');
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_password.text != _confirmPassword.text) {
+      Get.snackbar('Passwords do not match', 'Enter the same new password twice.');
+      return;
+    }
+    final result = await _controller.confirmNatconPasswordReset(
+      email: _email.text,
+      code: _code.text,
+      password: _password.text,
+    );
+    if (!mounted) return;
+    if (result['Result'] == 'true') {
+      Get.snackbar('Password updated', result['ResponseMsg'] ?? 'Sign in with your new password.');
+      Get.offAll(() => LoginScreen());
+    } else {
+      Get.snackbar('Could not reset password', result['ResponseMsg'] ?? 'Check the code and try again.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      body: Container(
-        color: transparent,
-        height: Get.height,
-        child: Stack(
-          children: [
-            Container(
-              height: Get.height * 0.35,
-              width: double.infinity,
-              child: Column(
-                children: [
-                  SizedBox(height: Get.height * 0.05),
-                  Row(
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          Get.back();
-                        },
-                        child: Container(
-                          height: 40,
-                          width: 40,
-                          alignment: Alignment.center,
-                          padding: EdgeInsets.all(13),
-                          margin: EdgeInsets.all(10),
-                          child: Image.asset(
-                            'assets/back.png',
-                            color: WhiteColor,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Color(0xFF000000).withOpacity(0.3),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                      SizedBox(
-                        width: Get.width * 0.25,
-                      ),
-                      Text(
-                        "Reset Password".tr,
-                        style: TextStyle(
-                          fontFamily: FontFamily.gilroyBold,
-                          fontSize: 17,
-                          color: WhiteColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                    height: Get.size.height * 0.025,
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Already have an account?".tr,
-                        style: TextStyle(
-                          color: WhiteColor,
-                          fontFamily: FontFamily.gilroyMedium,
-                          fontSize: 15,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () {
-                          Get.to(LoginScreen());
-                        },
-                        child: Text(
-                          " Login Now".tr,
-                          style: TextStyle(
-                            color: Color(0xFFFBBC04),
-                            fontFamily: FontFamily.gilroyBold,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                    height: Get.size.height * 0.04,
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 25),
-                    child: Image.asset(
-                      "assets/Rectangle326.png",
-                      height: 25,
-                    ),
-                  ),
-                ],
-              ),
-              decoration: BoxDecoration(
-                gradient: gradient.btnGradient,
-              ),
-            ),
-            Positioned(
-              top: Get.height * 0.22,
-              child: Container(
-                height: Get.size.height,
-                width: Get.size.width,
+      appBar: AppBar(
+        title: const Text('Reset password'),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Get.back()),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Form(
+                key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    SizedBox(
-                      height: 20,
-                    ),
-                    // SizedBox(
-                    //   height: Get.height * 0.005,
-                    // ),
+                    Icon(Icons.lock_reset, size: 58, color: colors.primary),
+                    const SizedBox(height: 18),
                     Text(
-                      "Please enter your phone number to request a\npassword reset"
-                          .tr,
+                      'Recover your NATCON account',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: BlackColor,
-                        fontFamily: "Gilroy Medium",
-                        fontSize: 16,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    SizedBox(
-                      height: 20,
+                    const SizedBox(height: 8),
+                    const Text(
+                      'We will send a one-time code to the email on your account. The code expires after 15 minutes.',
+                      textAlign: TextAlign.center,
                     ),
-                    Form(
-                      key: _formKey,
-                      autovalidateMode: AutovalidateMode.always,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 15),
-                        child: IntlPhoneField(
-                          keyboardType: TextInputType.number,
-                          cursorColor: BlackColor,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          initialCountryCode: 'IN',
-                          controller: number,
-                          onChanged: (value) {
-                            cuntryCode = value.countryCode;
-                          },
-                          onCountryChanged: (value) {
-                            number.text = '';
-                          },
-                          dropdownIcon: Icon(
-                            Icons.arrow_drop_down,
-                            color: greycolor,
-                          ),
-                          dropdownTextStyle: TextStyle(
-                            color: greycolor,
-                          ),
-                          style: TextStyle(
-                            fontFamily: 'Gilroy',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: BlackColor,
-                          ),
-                          decoration: InputDecoration(
-                            helperText: null,
-                            labelText: "Mobile Number".tr,
-                            labelStyle: TextStyle(
-                              color: greycolor,
-                              fontFamily: FontFamily.gilroyMedium,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            border: OutlineInputBorder(
-                              borderSide: BorderSide(
-                                color: Colors.grey.shade300,
-                              ),
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                          validator: (p0) {
-                            if (p0!.completeNumber.isEmpty) {
-                              return 'Please enter your number'.tr;
-                            } else {}
-                            return null;
-                          },
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 30,
-                    ),
-                    GestButton(
-                      Width: Get.size.width,
-                      height: 50,
-                      buttoncolor: gradient.defoultColor,
-                      margin: EdgeInsets.only(top: 15, left: 30, right: 30),
-                      buttontext: "Request OTP".tr,
-                      style: TextStyle(
-                        fontFamily: "Gilroy Bold",
-                        color: WhiteColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      onclick: () async {
-                        if (_formKey.currentState?.validate() ?? false) {
-                          if(number.text.isNotEmpty){
-                            signUpController.checkMobileInResetPassword(number: number.text, cuntryCode: cuntryCode).then((value) {
-                              print("++++++++ ${value}");
-                              var decodeValue = jsonDecode(value);
-                              print("----------- $decodeValue");
-                              if(decodeValue["Result"] == "false"){
-                                smsTypeController.smsTypeApi().then((smsType) {
-                                  // print("********************** ${smsType}");
-                                  if(smsType["Result"] == "true"){
-                                    if(smsType["otp_auth"] == "No"){
-                                      forgetPasswordBottomSheet();
-                                      showToastMessage(signUpController.signUpMsg);
-                                    } else{
-                                      if(smsType["SMS_TYPE"] == "Firebase"){
-                                        sendOTP(number.text, cuntryCode);
-                                        Get.toNamed(Routes.otpScreen, arguments: {
-                                          "number": number.text,
-                                          "cuntryCode": cuntryCode,
-                                          "route": "resetScreen",
-                                          "msgType": smsType["SMS_TYPE"].toString,
-                                        });
-                                      }else if (smsType["SMS_TYPE"] == "Msg91"){
-                                        //  msg_otp;
-                                        msgOtpController.msgOtpApi(mobile: "$cuntryCode${number.text}").then((msgOtp) {
-                                          if(msgOtp["Result"] == "true"){
-                                            Get.toNamed(Routes.otpScreen, arguments: {
-                                              "number": number.text,
-                                              "cuntryCode": cuntryCode,
-                                              "route": "resetScreen",
-                                              "otpCode": msgOtp["otp"].toString(),
-                                              "msgType": smsType["SMS_TYPE"].toString,
-                                            });
-                                            print("++++++++msgOtp+++++++++++ ${msgOtp["otp"]}");
-                                          }else{
-                                            showToastMessage("Invalid mobile number");
-                                          }
-                                        },);
-                                      }else if(smsType["SMS_TYPE"] == "Twilio"){
-                                        twilioOtpController.twilioOtpApi(mobile: "$cuntryCode${number.text}").then((twilioOtp) {
-                                          print("---------- $twilioOtp");
-                                          if(twilioOtp["Result"] == "true"){
-                                            Get.toNamed(Routes.otpScreen, arguments: {
-                                              "number": number.text,
-                                              "cuntryCode": cuntryCode,
-                                              "route": "resetScreen",
-                                              "otpCode": twilioOtp["otp"].toString(),
-                                              "msgType": smsType["SMS_TYPE"].toString,
-                                            });
-                                            print("++++++++twilioOtp+++++++++++ ${twilioOtp["otp"]}");
-                                          }else{
-                                            showToastMessage("Invalid mobile number");
-                                          }
-                                        },);
-                                      }else{}
-                                    }
-                                  }
-                                  else{
-                                    showToastMessage("Invalid mobile number");
-                                  }
-                                },);
-
-                              }else{
-                                showToastMessage(decodeValue["ResponseMsg"]);
-                              }
-                            },);
-                          }else{
-                            showToastMessage("Please Enter Mobile Number");
-                          }
-                        }
+                    const SizedBox(height: 28),
+                    TextFormField(
+                      controller: _email,
+                      enabled: !_codeSent,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(labelText: 'Account email'),
+                      validator: (value) {
+                        final email = value?.trim() ?? '';
+                        return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)
+                            ? null
+                            : 'Enter a valid email address';
                       },
                     ),
+                    if (_codeSent) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _code,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        decoration: const InputDecoration(labelText: '6-digit email code'),
+                        validator: (value) => (value?.trim().length ?? 0) == 6 ? null : 'Enter the 6-digit code',
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _password,
+                        obscureText: _hidePassword,
+                        decoration: InputDecoration(
+                          labelText: 'New password',
+                          suffixIcon: IconButton(
+                            onPressed: () => setState(() => _hidePassword = !_hidePassword),
+                            icon: Icon(_hidePassword ? Icons.visibility : Icons.visibility_off),
+                          ),
+                        ),
+                        validator: (value) => (value?.length ?? 0) >= 8 ? null : 'Use at least 8 characters',
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _confirmPassword,
+                        obscureText: true,
+                        decoration: const InputDecoration(labelText: 'Confirm new password'),
+                        validator: (value) => (value?.isNotEmpty ?? false) ? null : 'Confirm your password',
+                      ),
+                    ],
+                    const SizedBox(height: 22),
+                    GetBuilder<LoginController>(builder: (controller) {
+                      return FilledButton(
+                        onPressed: controller.passwordResetLoading ? null : (_codeSent ? _resetPassword : _requestCode),
+                        child: controller.passwordResetLoading
+                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Text(_codeSent ? 'Update password' : 'Send reset code'),
+                      );
+                    }),
+                    if (_codeSent)
+                      TextButton(
+                        onPressed: _controller.passwordResetLoading ? null : () => setState(() => _codeSent = false),
+                        child: const Text('Use another email or request a new code'),
+                      ),
+                    TextButton(onPressed: () => Get.offAll(() => LoginScreen()), child: const Text('Return to sign in')),
                   ],
                 ),
-                decoration: BoxDecoration(
-                  color: WhiteColor,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
               ),
-            )
-          ],
+            ),
+          ),
         ),
       ),
     );
   }
-  Future forgetPasswordBottomSheet() {
-    return Get.bottomSheet(
-      GetBuilder<LoginController>(builder: (context) {
-        return SingleChildScrollView(
-          child: Container(
-            height: 350,
-            width: Get.size.width,
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 15,
-                ),
-                Text(
-                  "Forgot Password".tr,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontFamily: FontFamily.gilroyBold,
-                    color: BlackColor,
-                  ),
-                ),
-                SizedBox(
-                  height: 15,
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                  ),
-                  child: Divider(
-                    color: greycolor,
-                  ),
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Container(
-                  alignment: Alignment.topLeft,
-                  padding: EdgeInsets.only(top: 5, left: 15),
-                  child: Text(
-                    "Create Your New Password".tr,
-                    style: TextStyle(
-                      fontFamily: FontFamily.gilroyMedium,
-                      color: BlackColor,
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  child: TextFormField(
-                    controller: loginController.newPassword,
-                    obscureText: loginController.newShowPassword,
-                    cursorColor: BlackColor,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontFamily: FontFamily.gilroyMedium,
-                      color: BlackColor,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password'.tr;
-                      }
-                      return null;
-                    },
-                    decoration: InputDecoration(
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      suffixIcon: InkWell(
-                        onTap: () {
-                          loginController.newShowOfPassword();
-                        },
-                        child: !loginController.newShowPassword
-                            ? Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(
-                            "assets/showpassowrd.png",
-                            height: 10,
-                            width: 10,
-                            color: greycolor,
-                          ),
-                        )
-                            : Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(
-                            "assets/HidePassword.png",
-                            height: 10,
-                            width: 10,
-                            color: greycolor,
-                          ),
-                        ),
-                      ),
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Image.asset(
-                          "assets/Unlock.png",
-                          height: 10,
-                          width: 10,
-                          color: greycolor,
-                        ),
-                      ),
-                      labelText: "Password".tr,
-                      labelStyle: TextStyle(
-                        color: greycolor,
-                        fontFamily: FontFamily.gilroyMedium,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 15),
-                  child: TextFormField(
-                    controller: loginController.newConformPassword,
-                    obscureText: loginController.conformPassword,
-                    cursorColor: BlackColor,
-                    style: TextStyle(
-                      fontFamily: FontFamily.gilroyMedium,
-                      fontSize: 14,
-                      color: BlackColor,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password'.tr;
-                      }
-                      return null;
-                    },
-                    decoration: InputDecoration(
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide(color: greycolor),
-                      ),
-                      suffixIcon: InkWell(
-                        onTap: () {
-                          loginController.newConformShowOfPassword();
-                        },
-                        child: !loginController.conformPassword
-                            ? Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(
-                            "assets/showpassowrd.png",
-                            height: 10,
-                            width: 10,
-                            color: greycolor,
-                          ),
-                        )
-                            : Padding(
-                          padding: const EdgeInsets.all(10),
-                          child: Image.asset(
-                            "assets/HidePassword.png",
-                            height: 10,
-                            width: 10,
-                            color: greycolor,
-                          ),
-                        ),
-                      ),
-                      prefixIcon: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: Image.asset(
-                          "assets/Unlock.png",
-                          height: 10,
-                          width: 10,
-                          color: greycolor,
-                        ),
-                      ),
-                      labelText: "Conform Password".tr,
-                      labelStyle: TextStyle(
-                        color: greycolor,
-                        fontFamily: FontFamily.gilroyMedium,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(
-                  height: 20,
-                ),
-                GestButton(
-                  Width: Get.size.width,
-                  height: 50,
-                  buttoncolor: gradient.defoultColor,
-                  margin: EdgeInsets.only(top: 15, left: 30, right: 30),
-                  buttontext: "Continue".tr,
-                  style: TextStyle(
-                    fontFamily: "Gilroy Bold",
-                    color: WhiteColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  onclick: () {
-                    if (loginController.newPassword.text ==
-                        loginController.newConformPassword.text) {
-                      loginController.setForgetPasswordApi(
-                          ccode: cuntryCode, mobile: number.text);
-                    } else {
-                      showToastMessage("Please Enter Valid Password".tr);
-                    }
-                  },
-                ),
-              ],
-            ),
-            decoration: BoxDecoration(
-              color: WhiteColor,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(30),
-                topRight: Radius.circular(30),
-              ),
-            ),
-          ),
-        );
-      }),
-    );
-  }
-}
-
-Future<void> sendOTP(String phonNumber, String cuntryCode,) async {
-  print("andsjfcbdhv");
-  await FirebaseAuth.instance.verifyPhoneNumber(
-    phoneNumber: '${cuntryCode + phonNumber}',
-    verificationCompleted: (PhoneAuthCredential credential) {},
-    verificationFailed: (FirebaseAuthException e) {},
-    timeout: Duration(seconds: 60),
-    codeSent: (String verificationId, int? resendToken) {
-      ResetPasswordScreen.verifay = verificationId;
-    },
-    codeAutoRetrievalTimeout: (String verificationId) {},
-  );
 }
