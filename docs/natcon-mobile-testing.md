@@ -1,6 +1,6 @@
 # NATCON mobile testing
 
-The purchased Flutter apps are separate clients for the legacy MagicMate API. The deployed NATCON backend is `api/natcon.php`; it does not implement the apps' `/user_api/` or `/orag_api/` contracts. Those legacy routes are intentionally blocked on the public host. Therefore, a successful APK build permits installation and UI inspection, but does not make login, booking, payment, QR check-in, or legacy event management work against NATCON.
+The attendee and organizer Flutter projects retain their original screens and navigation. Their app entry points were restored locally after an earlier change had launched a small `services/mobile` prototype instead. The restored screens still call the purchased app's legacy `/user_api/` and `/orag_api/` contracts, while the deployed NATCON backend is `api/natcon.php`; the legacy routes remain blocked on the public host. So the original screens are back in source, but attendee login, booking, payment, organizer login, scanning, and management are not yet integrated with the live NATCON service.
 
 ## Build debug APKs
 
@@ -16,7 +16,7 @@ flutter build apk --debug --dart-define=NATCON_BASE_URL=https://natcon.my360scho
 
 Artifacts are written under each app's `build/app/outputs/flutter-apk/`. These debug APKs use debug signing and are for direct device installation only; they are not Play Store releases. Flutter's `NATCON_BASE_URL` define only changes the host. It does not translate the old API contract into the NATCON service contract.
 
-The organizer app includes a camera scanner, but its verifier calls the legacy `/orag_api/qr_ticket_verify.php` route and cannot validate NATCON tickets. For NATCON testing, use the role-based HTTPS staff console at `/operations/`, which uses `/api/natcon.php` and supports the registrar camera/manual scanner.
+The organizer app includes a camera scanner, but its verifier calls the legacy `/orag_api/qr_ticket_verify.php` route and cannot validate NATCON tickets yet. Until the integration work is complete, use the role-based HTTPS staff console at `/operations/`, which uses `/api/natcon.php` and supports the registrar camera/manual scanner.
 
 ## Before testing a full NATCON flow
 
@@ -26,4 +26,4 @@ The organizer app includes a camera scanner, but its verifier calls the legacy `
 - Confirm the configured Firebase project, Android package IDs, SHA-1 fingerprints, and enabled Firebase products before relying on push/auth/cloud features in the old apps. Their checked-in Firebase files belong to the purchased app setup and do not connect them to NATCON registration.
 - Use two registrar phones or browsers to verify duplicate scan behavior. Camera scanning requires HTTPS and browser camera permission.
 
-The NATCON web portal remains the working attendee registration and ticket channel. Connecting the old native apps requires a separate mobile integration against the NATCON API or a dedicated compatibility adapter; no app login or registration contract should be inferred from an APK compiling.
+The NATCON web portal remains the working attendee registration and ticket channel. See [the integration plan](natcon-mobile-integration-plan.md) and [feature/API matrix](natcon-mobile-feature-matrix.md) for the shared-backend work. An APK compiling alone does not prove that its login, registration, payment, or scanner calls reach NATCON.

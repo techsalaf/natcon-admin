@@ -32,3 +32,9 @@ jobs:
       - name: Analyze Dart sources
         working-directory: ${{ matrix.project }}
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
+      - name: Test app entrypoint regression
+        working-directory: ${{ matrix.project }}
+        run: flutter test
+      - name: Evaluate app entrypoint contract
+        working-directory: ${{ matrix.project }}
+        run: node evals/entrypoint.cjs

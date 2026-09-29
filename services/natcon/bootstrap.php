@@ -29,10 +29,42 @@ function migrate(\PDO $db): void {
         "natcon_outbox (id $id, recipient VARCHAR(190) NOT NULL, subject VARCHAR(190) NOT NULL, body TEXT NOT NULL, status VARCHAR(20) NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL, sent_at VARCHAR(30))",
         "natcon_limits (bucket VARCHAR(100) PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL)",
         "natcon_transfer_receipts (bank_reference VARCHAR(190) PRIMARY KEY, reference VARCHAR(64) NOT NULL UNIQUE, amount_kobo INTEGER NOT NULL, staff_id BIGINT NOT NULL, verified_at VARCHAR(30) NOT NULL)",
-        "natcon_locks (name VARCHAR(50) PRIMARY KEY, value INTEGER NOT NULL)"
+        "natcon_locks (name VARCHAR(50) PRIMARY KEY, value INTEGER NOT NULL)",
+        "natcon_accounts (id $id, name VARCHAR(150) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE, country_code VARCHAR(12) NOT NULL DEFAULT '', phone VARCHAR(40) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, profile_image TEXT, referral_code VARCHAR(32) NOT NULL UNIQUE, referred_by BIGINT, wallet_balance_kobo INTEGER NOT NULL DEFAULT 0, status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
+        "natcon_categories (id $id, title VARCHAR(150) NOT NULL, image_url TEXT, status VARCHAR(20) NOT NULL DEFAULT 'active', sort_order INTEGER NOT NULL DEFAULT 0)",
+        "natcon_events (id $id, owner_staff_id BIGINT, category_id BIGINT, title VARCHAR(190) NOT NULL, slug VARCHAR(190) NOT NULL UNIQUE, description TEXT, venue VARCHAR(255), latitude VARCHAR(40), longitude VARCHAR(40), starts_at VARCHAR(30), ends_at VARCHAR(30), currency VARCHAR(3) NOT NULL DEFAULT 'NGN', status VARCHAR(20) NOT NULL DEFAULT 'draft', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
+        "natcon_ticket_types (id $id, event_id BIGINT NOT NULL, label VARCHAR(120) NOT NULL, description TEXT, price_kobo INTEGER NOT NULL, capacity INTEGER NOT NULL DEFAULT 0, sales_start VARCHAR(30), sales_end VARCHAR(30), status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL, UNIQUE(event_id,label))",
+        "natcon_wallet_ledger (id $id, account_id BIGINT NOT NULL, direction VARCHAR(10) NOT NULL, amount_kobo INTEGER NOT NULL, reference VARCHAR(100) NOT NULL UNIQUE, status VARCHAR(20) NOT NULL, description VARCHAR(255) NOT NULL, created_at VARCHAR(30) NOT NULL)",
+        "natcon_coupons (id $id, event_id BIGINT, code VARCHAR(64) NOT NULL UNIQUE, title VARCHAR(150) NOT NULL, discount_type VARCHAR(10) NOT NULL, discount_value INTEGER NOT NULL, minimum_kobo INTEGER NOT NULL DEFAULT 0, usage_limit INTEGER NOT NULL DEFAULT 0, usage_count INTEGER NOT NULL DEFAULT 0, expires_at VARCHAR(30), status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL)",
+        "natcon_coupon_redemptions (id $id, coupon_id BIGINT NOT NULL, account_id BIGINT NOT NULL, order_reference VARCHAR(64) NOT NULL UNIQUE, discount_kobo INTEGER NOT NULL, created_at VARCHAR(30) NOT NULL)",
+        "natcon_favorites (id $id, account_id BIGINT NOT NULL, event_id BIGINT NOT NULL, created_at VARCHAR(30) NOT NULL, UNIQUE(account_id,event_id))",
+        "natcon_reviews (id $id, account_id BIGINT NOT NULL, event_id BIGINT NOT NULL, order_reference VARCHAR(64) NOT NULL, rating INTEGER NOT NULL, comment TEXT, status VARCHAR(20) NOT NULL DEFAULT 'published', created_at VARCHAR(30) NOT NULL, UNIQUE(account_id,event_id))",
+        "natcon_referrals (id $id, referrer_account_id BIGINT NOT NULL, referred_account_id BIGINT NOT NULL UNIQUE, referral_code VARCHAR(32) NOT NULL, reward_kobo INTEGER NOT NULL DEFAULT 0, status VARCHAR(20) NOT NULL DEFAULT 'pending', created_at VARCHAR(30) NOT NULL)",
+        "natcon_payouts (id $id, staff_id BIGINT NOT NULL, amount_kobo INTEGER NOT NULL, bank_name VARCHAR(120) NOT NULL, account_name VARCHAR(150) NOT NULL, account_number VARCHAR(40) NOT NULL, note TEXT, status VARCHAR(20) NOT NULL DEFAULT 'pending', reviewed_by BIGINT, reviewed_at VARCHAR(30), created_at VARCHAR(30) NOT NULL)",
+        "natcon_event_media (id $id, event_id BIGINT NOT NULL, media_type VARCHAR(20) NOT NULL, url TEXT NOT NULL, title VARCHAR(190), sort_order INTEGER NOT NULL DEFAULT 0, status VARCHAR(20) NOT NULL DEFAULT 'active')",
+        "natcon_artists (id $id, event_id BIGINT NOT NULL, name VARCHAR(150) NOT NULL, role VARCHAR(120), image_url TEXT, status VARCHAR(20) NOT NULL DEFAULT 'active')",
+        "natcon_event_facilities (id $id, event_id BIGINT NOT NULL, title VARCHAR(150) NOT NULL, description TEXT, status VARCHAR(20) NOT NULL DEFAULT 'active')",
+        "natcon_event_restrictions (id $id, event_id BIGINT NOT NULL, title VARCHAR(150) NOT NULL, description TEXT, status VARCHAR(20) NOT NULL DEFAULT 'active')",
+        "natcon_faqs (id $id, question VARCHAR(255) NOT NULL, answer TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'active', sort_order INTEGER NOT NULL DEFAULT 0)",
+        "natcon_pages (id $id, slug VARCHAR(190) NOT NULL UNIQUE, title VARCHAR(190) NOT NULL, content TEXT NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'published', updated_at VARCHAR(30))",
+        "natcon_notifications (id $id, account_id BIGINT NOT NULL, title VARCHAR(190) NOT NULL, body TEXT NOT NULL, channel VARCHAR(20) NOT NULL DEFAULT 'in_app', read_at VARCHAR(30), created_at VARCHAR(30) NOT NULL)",
+        "natcon_devices (id $id, account_id BIGINT NOT NULL, provider VARCHAR(20) NOT NULL, device_token VARCHAR(512) NOT NULL UNIQUE, updated_at VARCHAR(30) NOT NULL)",
+        "natcon_chat_threads (id $id, account_id BIGINT NOT NULL, event_id BIGINT, status VARCHAR(20) NOT NULL DEFAULT 'open', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
+        "natcon_chat_messages (id $id, thread_id BIGINT NOT NULL, sender_type VARCHAR(20) NOT NULL, sender_id BIGINT NOT NULL, message TEXT NOT NULL, created_at VARCHAR(30) NOT NULL)",
+        "natcon_otp_challenges (id $id, destination VARCHAR(190) NOT NULL, channel VARCHAR(20) NOT NULL, code_hash VARCHAR(255) NOT NULL, expires_at VARCHAR(30) NOT NULL, consumed_at VARCHAR(30), attempts INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL)"
     ] as $schema) $db->exec('CREATE TABLE IF NOT EXISTS '.$schema);
-    // Safe, repeatable upgrade for delegates already registered on an older release.
     $driver=$db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+    // Add commerce ownership/discount fields to existing conference orders without rewriting records.
+    $orderColumns=$driver==='sqlite'
+        ? array_column($db->query('PRAGMA table_info(natcon_orders)')->fetchAll(), 'name')
+        : array_column(query($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='natcon_orders'")->fetchAll(), 'COLUMN_NAME');
+    foreach(['event_id'=>'BIGINT NULL','ticket_type_id'=>'BIGINT NULL','account_id'=>'BIGINT NULL','coupon_id'=>'BIGINT NULL','subtotal_kobo'=>'INTEGER NULL','discount_kobo'=>'INTEGER NOT NULL DEFAULT 0','wallet_kobo'=>'INTEGER NOT NULL DEFAULT 0','tax_kobo'=>'INTEGER NOT NULL DEFAULT 0'] as $column=>$type)
+        if(!in_array($column,$orderColumns,true)) $db->exec("ALTER TABLE natcon_orders ADD COLUMN $column $type");
+    $delegateColumns=$driver==='sqlite'
+        ? array_column($db->query('PRAGMA table_info(natcon_delegates)')->fetchAll(), 'name')
+        : array_column(query($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='natcon_delegates'")->fetchAll(), 'COLUMN_NAME');
+    if(!in_array('account_id',$delegateColumns,true)) $db->exec('ALTER TABLE natcon_delegates ADD COLUMN account_id BIGINT NULL');
+    // Safe, repeatable upgrade for delegates already registered on an older release.
     $columns=$driver==='sqlite'
         ? array_column($db->query('PRAGMA table_info(natcon_delegates)')->fetchAll(), 'name')
         : array_column(query($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='natcon_delegates'")->fetchAll(), 'COLUMN_NAME');
