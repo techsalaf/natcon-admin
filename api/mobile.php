@@ -53,9 +53,9 @@ try {
         mobileReply(['Result'=>'false','ResponseMsg'=>'Choose a password reset step.'],400);
     }
     if($client==='user_api'&&$endpoint==='u_home_data.php'){
-        $account=accountForToken($db);$canonical=\Natcon\event($c,$db);$card=mobileEventCard($db,$c);$today=(new DateTimeImmutable('now',new DateTimeZone('Africa/Lagos')))->format('Y-m-d');$open=$today<=$canonical['end_date'];
+        $account=accountForToken($db);$cards=\Natcon\mobileEventCards($db);
         $wallet=$account?(int)$account['wallet_balance_kobo']/100:0;
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>\Natcon\mobileEventCategories($db),'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>$open?[$card]:[],'wallet'=>(string)$wallet,'upcoming_event'=>$open?[$card]:[],'nearby_event'=>[],'this_month_event'=>$open?[$card]:[]]]);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>\Natcon\mobileEventCategories($db),'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>$cards,'wallet'=>(string)$wallet,'upcoming_event'=>$cards,'nearby_event'=>[],'this_month_event'=>$cards]]);
     }
     if($client==='user_api'&&$endpoint==='u_cat_event.php'){
         $categoryId=clean($in['cat_id']??'',32);
@@ -82,13 +82,14 @@ try {
     }
     if($client==='user_api'&&$endpoint==='u_couponlist.php'){
         if(!accountForToken($db))mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
-        mobileReply(['Result'=>'true','ResponseMsg'=>'Coupons loaded.','couponlist'=>\Natcon\availableCoupons($db,max(0,(int)($in['subtotal_kobo']??0)))]);
+        mobileReply(['Result'=>'true','ResponseMsg'=>'Coupons loaded.','couponlist'=>\Natcon\availableCoupons($db,max(0,(int)($in['subtotal_kobo']??0)),clean($in['event_id']??'',32))]);
     }
     if($client==='user_api'&&$endpoint==='u_check_coupon.php'){
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
-        $coupon=query($db,'SELECT code,minimum_kobo FROM natcon_coupons WHERE id=?',[clean($in['cid']??'',64)])->fetch();
+        $coupon=query($db,'SELECT code,minimum_kobo,event_id FROM natcon_coupons WHERE id=?',[clean($in['cid']??'',64)])->fetch();
         if(!$coupon)mobileReply(['Result'=>'false','ResponseMsg'=>'Coupon not found.']);
-        try{\Natcon\applicableCoupon($db,(string)$coupon['code'],(int)$coupon['minimum_kobo']);mobileReply(['Result'=>'true','ResponseMsg'=>'Coupon is valid. The final discount will be calculated by NATCON at checkout.']);}
+        $eventId=clean($in['event_id']??($coupon['event_id']??''),32);if($eventId==='')$eventId=(string)\Natcon\primaryConference($db)['id'];
+        try{\Natcon\applicableCoupon($db,(string)$coupon['code'],(int)$coupon['minimum_kobo'],$eventId);mobileReply(['Result'=>'true','ResponseMsg'=>'Coupon is valid. The final discount will be calculated by NATCON at checkout.']);}
         catch(InvalidArgumentException $e){mobileReply(['Result'=>'false','ResponseMsg'=>$e->getMessage()]);}
     }
     if($client==='user_api'&&$endpoint==='notification.php'){
@@ -110,13 +111,13 @@ try {
     }
     if($client==='user_api'&&$endpoint==='u_wallet_up.php')mobileReply(['Result'=>'false','ResponseMsg'=>'Wallet credits are added only after NATCON verifies your payment.'],410);
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
-        $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
-        $account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null);
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>\Natcon\mobileReviews($db,(int)$primary['id'])]);
+        $eventId=clean($in['event_id']??'',32);$primary=\Natcon\primaryConference($db);if(in_array($eventId,['NATCON-2026','2026'],true))$eventId=(string)$primary['id'];
+        $event=\Natcon\publishedEvent($db,$eventId);$account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null,(string)$event['id']);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>\Natcon\mobileReviews($db,(int)$event['id'])]);
     }
     if($client==='user_api'&&$endpoint==='u_event_type_price.php'){
-        $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket price loaded.','EventTypePrice'=>[mobileTicketType($db,$c)]]);
+        $eventId=clean($in['event_id']??'',32);$primary=\Natcon\primaryConference($db);if(in_array($eventId,['NATCON-2026','2026'],true))$eventId=(string)$primary['id'];
+        \Natcon\publishedEvent($db,$eventId);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket prices loaded.','EventTypePrice'=>\Natcon\mobileTicketTypes($db,$c,$eventId)]);
     }
     if($client==='orag_api'&&$endpoint==='u_login_user.php'){
         limit($db,'mobile-staff-login:'.($_SERVER['REMOTE_ADDR']??''),10);

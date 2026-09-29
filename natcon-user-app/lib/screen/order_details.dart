@@ -368,11 +368,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                             ?.eventData
                                                             .sponsoreId,
                                                     subtotal: subtotal,
+                                                    eventId: eventDetailsController.eventInfo?.eventData.eventId,
                                                   );
                                                   Get.toNamed(
                                                     Routes.couponScreen,
                                                     arguments: {
-                                                      "price": subtotal
+                                                      "price": subtotal,
+                                                      "event_id": eventDetailsController.eventInfo?.eventData.eventId,
                                                     },
                                                   )?.then((value) {
                                                     setState(() {
@@ -746,6 +748,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       final order = await bookEventController.createNatconOrder(
         account: Map<String, dynamic>.from(account),
         delegates: delegates,
+        eventId: eventDetailsController.eventInfo!.eventData.eventId,
+        ticketTypeId: eventDetailsController.ticketID,
         couponCode: couponCode,
         useWallet: status == true,
       );

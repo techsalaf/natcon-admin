@@ -6,7 +6,8 @@
   let user = null, activeView = 'overview', stream = null, scanTimer = null;
   let scanning = false, checking = false, selectedToken = '', approvalReference = '', cancelReference = '', payoutReviewId = '', payoutReviewStatus = '', noticeTimer;
   let delegateRequest = 0;
-  const titles = { overview: 'Conference overview', delegates: 'Delegate register', scanner: 'Welcome desk', transfers: 'Bank transfers', payouts: 'Payouts' };
+  const titles = { overview: 'Conference overview', delegates: 'Delegate register', events: 'Events & tickets', scanner: 'Welcome desk', transfers: 'Bank transfers', payouts: 'Payouts' };
+  let catalogue = { events: [], categories: [], ticket_types: [] };
   function node(tag, text, className) {
     const element = document.createElement(tag);
     if (text !== undefined) element.textContent = text;
@@ -26,7 +27,7 @@
   function signedOut() {
     stopCamera(); user = null; selectedToken = ''; api.csrf = ''; delegateRequest++;
     $('app').hidden = true; $('login-view').hidden = false; $('loading').hidden = true;
-    $('approve-dialog').close(); $('payout-review-dialog').close(); $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren(); $('payout-list').replaceChildren();
+    $('approve-dialog').close(); $('payout-review-dialog').close(); $('event-dialog').close(); $('ticket-type-dialog').close(); $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren(); $('payout-list').replaceChildren();
     $('scan-result').replaceChildren(node('h2', 'Waiting for a ticket')); $('logistics').hidden = true;
     $('email').focus();
   }
@@ -44,7 +45,7 @@
     await changeView('overview');
   }
   async function changeView(view) {
-    if (!titles[view] || (['transfers', 'payouts'].includes(view) && !C.canFinance(user)) || (view === 'scanner' && !C.canCheckin(user))) return;
+    if (!titles[view] || (['transfers', 'payouts'].includes(view) && !C.canFinance(user)) || (view === 'scanner' && !C.canCheckin(user)) || (view === 'events' && user?.role !== 'admin')) return;
     if (view !== 'scanner') stopCamera();
     activeView = view; $('page-error').hidden = true; $('page-title').textContent = titles[view];
     document.querySelectorAll('.view').forEach((section) => { section.hidden = section.id !== 'view-' + view; });
@@ -59,6 +60,41 @@
     if (activeView === 'delegates') await loadDelegates();
     if (activeView === 'transfers') await loadTransfers();
     if (activeView === 'payouts') await loadPayouts();
+    if (activeView === 'events') await loadCatalogue();
+  }
+  async function loadCatalogue() {
+    catalogue = await api.request('event_catalogue');
+    $('event-list').replaceChildren(); $('event-empty').hidden = catalogue.events.length > 0;
+    catalogue.events.forEach((event) => {
+      const card = node('article', undefined, 'transfer-card'), info = node('div'), actions = node('div', undefined, 'transfer-right');
+      info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} · ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} · ${event.total_book_ticket || 0} paid delegates`));
+      const edit = node('button', 'Edit event', 'secondary'); edit.addEventListener('click', () => openEventEditor(event)); actions.append(edit); card.append(info, actions); $('event-list').append(card);
+    });
+    $('event-category').replaceChildren(); $('ticket-event').replaceChildren();
+    catalogue.categories.forEach((category) => { const option = new Option(category.title, category.id); $('event-category').add(option); });
+    catalogue.events.forEach((event) => { const option = new Option(event.event_title, event.event_id); $('ticket-event').add(option); });
+    $('ticket-type-rows').replaceChildren(); $('ticket-type-empty').hidden = catalogue.ticket_types.length > 0;
+    catalogue.ticket_types.forEach((ticket) => {
+      const row = document.createElement('tr'); row.append(detailCell(ticket.type, ticket.description), detailCell(ticket.event_title), detailCell(C.money(Math.round(Number(ticket.price) * 100))), detailCell(ticket.tlimit === '0' ? 'Unlimited' : ticket.tlimit), detailCell(ticket.status === '1' ? 'Active' : 'Inactive'));
+      const actionCell = node('td'), edit = node('button', 'Edit', 'text-button'); edit.addEventListener('click', () => openTicketEditor(ticket)); actionCell.append(edit); row.append(actionCell); $('ticket-type-rows').append(row);
+    });
+  }
+  function openEventEditor(event) {
+    $('event-form').reset(); $('event-error').hidden = true;
+    $('event-dialog-title').textContent = event ? 'Edit event' : 'Create event'; $('event-id').value = event?.event_id || '';
+    $('event-title').value = event?.event_title || ''; $('event-category').value = event?.event_cat_id || catalogue.categories[0]?.id || '';
+    $('event-venue').value = event?.event_place_name || event?.event_address || ''; $('event-description').value = event?.event_description || '';
+    $('event-date').value = event?.event_start_date || ''; $('event-start').value = (event?.event_start_time || '09:00').slice(0,5); $('event-end').value = (event?.event_end_time || '17:00').slice(0,5);
+    $('event-latitude').value = event?.event_latitude || ''; $('event-longitude').value = event?.event_longtitude || '';
+    $('event-status').value = event?.event_status || 'draft'; $('event-disclaimer').value = event?.event_disclaimer || ''; $('event-tags').value = event?.event_tags || ''; $('event-videos').value = event?.event_vurls || '';
+    $('event-dialog').showModal(); $('event-title').focus();
+  }
+  function openTicketEditor(ticket) {
+    $('ticket-type-form').reset(); $('ticket-type-error').hidden = true; $('ticket-type-title').textContent = ticket ? 'Edit ticket type' : 'Add ticket type';
+    $('ticket-type-id').value = ticket?.id || ''; $('ticket-event').value = ticket?.event_id || catalogue.events[0]?.event_id || '';
+    $('ticket-label').value = ticket?.type || ''; $('ticket-description').value = ticket?.description || ''; $('ticket-price').value = ticket?.price || '';
+    $('ticket-capacity').value = ticket?.tlimit || 0; $('ticket-status').value = ticket?.status === '0' ? 'inactive' : 'active';
+    $('ticket-type-dialog').showModal(); $('ticket-label').focus();
   }
   async function loadDashboard() {
     const data = await api.request('dashboard');
@@ -326,6 +362,32 @@
         await api.request('review_payout', { payout_id: payoutReviewId, status: payoutReviewStatus, note });
         $('payout-review-dialog').close(); notify('Payout request updated.'); await loadPayouts();
       } catch (error) { if (error.status === 401) handleError(error); else showError('payout-review-error', error); }
+    });
+  });
+  $('new-event').addEventListener('click', () => openEventEditor(null));
+  $('close-event').addEventListener('click', () => $('event-dialog').close());
+  $('event-form').addEventListener('submit', (event) => {
+    event.preventDefault(); $('event-error').hidden = true;
+    busy(event.submitter || $('event-form').querySelector('button[type="submit"]'), async () => {
+      try {
+        await api.request('save_event', { event_id: $('event-id').value || null, title: $('event-title').value.trim(), cat_id: $('event-category').value, pname: $('event-venue').value.trim(), address: $('event-venue').value.trim(), cdesc: $('event-description').value, sdate: $('event-date').value, stime: $('event-start').value, etime: $('event-end').value, latitude: $('event-latitude').value, longtitude: $('event-longitude').value, status: $('event-status').value, disclaimer: $('event-disclaimer').value, tags: $('event-tags').value, vurls: $('event-videos').value });
+        $('event-dialog').close(); notify('Event saved to the shared NATCON catalogue.'); await loadCatalogue();
+      } catch (error) { if (error.status === 401) handleError(error); else showError('event-error', error); }
+    });
+  });
+  $('new-ticket-type').addEventListener('click', () => {
+    if (!catalogue.events.length) { notify('Create an event before adding ticket types.'); return; }
+    openTicketEditor(null);
+  });
+  $('close-ticket-type').addEventListener('click', () => $('ticket-type-dialog').close());
+  $('ticket-type-form').addEventListener('submit', (event) => {
+    event.preventDefault(); $('ticket-type-error').hidden = true;
+    busy(event.submitter || $('ticket-type-form').querySelector('button[type="submit"]'), async () => {
+      try {
+        C.nairaToKobo($('ticket-price').value);
+        await api.request('save_ticket_type', { ticket_type_id: $('ticket-type-id').value || null, event_id: $('ticket-event').value, label: $('ticket-label').value.trim(), description: $('ticket-description').value, price: $('ticket-price').value.trim(), capacity: $('ticket-capacity').value, status: $('ticket-status').value });
+        $('ticket-type-dialog').close(); notify('Ticket type saved to the shared NATCON catalogue.'); await loadCatalogue();
+      } catch (error) { if (error.status === 401) handleError(error); else showError('ticket-type-error', error); }
     });
   });
   $('export').addEventListener('click', (event) => busy(event.currentTarget, async () => {

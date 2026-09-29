@@ -22,6 +22,7 @@ class _CouponScreenState extends State<CouponScreen> {
   BookEventController bookEventController = Get.find();
 
   double price = Get.arguments["price"];
+  String eventId = Get.arguments["event_id"]?.toString() ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -142,9 +143,10 @@ class _CouponScreenState extends State<CouponScreen> {
                                                         .couponList[index]
                                                         .minAmt)) {
                                                   couponController
-                                                      .checkCouponDataApi(
+                                                  .checkCouponDataApi(
                                                     cid: couponController
                                                         .couponList[index].id,
+                                                    eventId: eventId,
                                                   );
                                                   bookEventController
                                                           .couponAmt =

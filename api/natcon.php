@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile};
+use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,organizerEvents,organizerCategories,organizerTicketTypes,saveOrganizerEvent,saveOrganizerTicketType};
 header('X-Content-Type-Options: nosniff');header('Cache-Control: no-store');header('Content-Type: application/json; charset=utf-8');
 ini_set('session.use_strict_mode', '1');
 session_name('natcon_staff');session_set_cookie_params(['httponly'=>true,'secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','samesite'=>'Strict','path'=>'/']);session_start();
@@ -12,7 +12,7 @@ try {
     $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db));
     $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders'];
+    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
     elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
     elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
@@ -47,7 +47,7 @@ try {
         if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Enter a valid email address.');
         recover($db,$c,$email);respond(['message'=>'If a registration matches this email, a secure link will be sent.']);
     }
-    if($action==='ticket')respond(delegate($db,clean($_GET['token']??''))+['event'=>event($c,$db)]);
+    if($action==='ticket'){$ticket=delegate($db,clean($_GET['token']??''));respond($ticket+['event'=>event($c,$db,(string)$ticket['event_id'])]);}
     if($action==='qr'){$d=delegate($db,clean($_GET['token']??''));require_once dirname(__DIR__).'/qr/phpqrcode.php';header('Content-Type: image/png');\QRcode::png($d['ticket_token'],false,QR_ECLEVEL_M,7,2);exit;}
     if($action==='mobile_login'){
         limit($db,'mobile-login:'.($_SERVER['REMOTE_ADDR']??''),10);$u=query($db,'SELECT * FROM natcon_staff WHERE email=?',[strtolower(clean($in['email']??''))])->fetch();
@@ -65,6 +65,20 @@ try {
     if($action==='logout'){if(isset($user['token_id']))query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE id=?',[now(),$user['token_id']]);$_SESSION=[];session_destroy();respond(['logged_out'=>true]);}
     if($action==='dashboard'){
         respond(['total_delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),'paid_delegates'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON d.reference=o.reference WHERE o.status='paid'")->fetchColumn(),'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),'revenue_kobo'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),'chapters'=>query($db,'SELECT chapter,COUNT(*) AS total FROM natcon_delegates GROUP BY chapter ORDER BY total DESC')->fetchAll()]);
+    }
+    if($action==='event_catalogue'){
+        requireStaff(['admin']);$events=organizerEvents($db);$types=organizerTicketTypes($db);
+        respond(['events'=>$events,'categories'=>organizerCategories($db),'ticket_types'=>$types]);
+    }
+    if($action==='save_event'){
+        $user=requireStaff(['admin']);$in['_staff_id']=(int)$user['id'];$id=filter_var($in['event_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if(!empty($in['event_id'])&&!$id)throw new InvalidArgumentException('Choose a valid NATCON event.');
+        respond(saveOrganizerEvent($db,$in,$id?:null));
+    }
+    if($action==='save_ticket_type'){
+        $user=requireStaff(['admin']);$in['_staff_id']=(int)$user['id'];$id=filter_var($in['ticket_type_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+        if(!empty($in['ticket_type_id'])&&!$id)throw new InvalidArgumentException('Choose a valid ticket type.');
+        respond(saveOrganizerTicketType($db,['event_id'=>$in['event_id']??null,'etype'=>$in['label']??'','description'=>$in['description']??'','price'=>$in['price']??'','tlimit'=>$in['capacity']??0,'status'=>($in['status']??'active')==='active'?'1':'0','_staff_id'=>$in['_staff_id']],$id?:null));
     }
     if($action==='payouts'){requireStaff(['admin','finance']);respond(['items'=>\Natcon\payoutHistory($db,(int)$user['id'],$user['role']),'balance'=>\Natcon\payoutBalance($db)]);}
     if($action==='request_payout'){$user=requireStaff(['admin']);respond(\Natcon\requestPayout($db,(int)$user['id'],\Natcon\payoutNairaToKobo($in['amount']??''),$in));}

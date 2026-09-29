@@ -253,12 +253,23 @@ class _ListOfCounterState extends State<ListOfCounter> {
                   Expanded(
                     child: InkWell(
                       onTap: () {
-                        if (preIndex != widget.index) {
-                          setState(() {
-                            
-                          });
+                        final index = widget.index ?? 0;
+                        final ticket = eventDetailsController.ticketInfo!.eventTypePrice[index];
+                        final remaining = ticket.remainTicket;
+                        if (preIndex != index) {
+                          if (remaining < 1) return;
+                          preIndex = index;
+                          eventDetailsController.ticketID = ticket.typeid;
+                          eventDetailsController.ticketType = ticket.ticketType;
+                          eventDetailsController.ticketPrice = ticket.ticketPrice;
+                          eventDetailsController.totalTicket = 1;
+                        } else if (eventDetailsController.totalTicket < 50 &&
+                            (remaining <= 0 || eventDetailsController.totalTicket < remaining)) {
+                          eventDetailsController.totalTicket++;
                         }
-                        
+                        eventDetailsController.totalTicke = eventDetailsController.totalTicket.toString();
+                        eventDetailsController.mTotal = (double.tryParse(ticket.ticketPrice) ?? 0) * eventDetailsController.totalTicket;
+                        eventDetailsController.update();
                       },
                       child: Container(
                         alignment: Alignment.center,
@@ -278,7 +289,21 @@ class _ListOfCounterState extends State<ListOfCounter> {
                   Expanded(
                     child: InkWell(
                       onTap: () {
-                        
+                        final index = widget.index ?? 0;
+                        if (preIndex != index || eventDetailsController.totalTicket < 1) return;
+                        eventDetailsController.totalTicket--;
+                        if (eventDetailsController.totalTicket == 0) {
+                          preIndex = -1;
+                          eventDetailsController.ticketID = '';
+                          eventDetailsController.ticketType = '';
+                          eventDetailsController.ticketPrice = '';
+                          eventDetailsController.totalTicke = '';
+                          eventDetailsController.mTotal = 0;
+                        } else {
+                          eventDetailsController.totalTicke = eventDetailsController.totalTicket.toString();
+                          eventDetailsController.mTotal = double.parse(eventDetailsController.ticketPrice) * eventDetailsController.totalTicket;
+                        }
+                        eventDetailsController.update();
                       },
                       child: Container(
                         alignment: Alignment.center,
