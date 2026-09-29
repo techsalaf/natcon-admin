@@ -41,6 +41,20 @@ try {
         $wallet=$account?(int)$account['wallet_balance_kobo']/100:0;
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>[],'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>[],'wallet'=>(string)$wallet,'upcoming_event'=>$open?[$card]:[],'nearby_event'=>[],'this_month_event'=>$open?[$card]:[]]]);
     }
+    if($client==='user_api'&&$endpoint==='u_pagelist.php')mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Pages loaded.','pagelist'=>\Natcon\mobilePages($db)]);
+    if($client==='user_api'&&$endpoint==='u_faq.php')mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'FAQs loaded.','FaqData'=>\Natcon\mobileFaqs($db)]);
+    if($client==='user_api'&&$endpoint==='u_fav.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        $saved=\Natcon\toggleFavorite($db,(int)$account['id'],clean($in['eid']??'',64));mobileReply(['Result'=>'true','ResponseMsg'=>$saved?'Added to favorites.':'Removed from favorites.','is_favorite'=>$saved]);
+    }
+    if($client==='user_api'&&$endpoint==='u_favlist.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Favorites loaded.','FavEventData'=>\Natcon\favoriteEvents($db,(int)$account['id'])]);
+    }
+    if($client==='user_api'&&$endpoint==='notification.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Notifications loaded.','NotificationData'=>\Natcon\mobileNotifications($db,(int)$account['id'])]);
+    }
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
         $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
         $account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null);

@@ -151,6 +151,19 @@ function mobileTicketType(\PDO $db,array $c): array {
     $event=primaryConference($db);$type=activeTicketType($db,(int)$event['id']);$capacity=(int)$type['capacity'];$sold=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.ticket_type_id=? AND o.status IN ('paid','pending','awaiting_review')",[$type['id']])->fetchColumn();$remaining=$capacity>0?max(0,$capacity-$sold):99999;$price=number_format((int)$type['price_kobo']/100,2,'.','');
     return ['typeid'=>(string)$type['id'],'ticket_type'=>$type['label'],'ticket_price'=>$price,'TotalTicket'=>$capacity?:99999,'description'=>$type['description']??'','remainTicket'=>$remaining,'tPrice'=>$price];
 }
+function toggleFavorite(\PDO $db,int $accountId,string $eventId): bool {
+    $event=primaryConference($db);if(!in_array($eventId,[(string)$event['id'],'NATCON-2026','2026'],true))throw new \InvalidArgumentException('NATCON event not found.');
+    $exists=query($db,'SELECT id FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();
+    if($exists){query($db,'DELETE FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']]);return false;}
+    query($db,'INSERT INTO natcon_favorites(account_id,event_id,created_at) VALUES(?,?,?)',[$accountId,$event['id'],now()]);return true;
+}
+function favoriteEvents(\PDO $db,int $accountId): array {
+    $event=primaryConference($db);$ids=query($db,'SELECT event_id FROM natcon_favorites WHERE account_id=?',[$accountId])->fetchAll();
+    return array_map(static fn($row)=>['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_sdate'=>substr((string)$event['starts_at'],0,10),'event_place_name'=>$event['venue']],$ids);
+}
+function mobileFaqs(\PDO $db): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'store_id'=>null,'question'=>$r['question'],'answer'=>$r['answer'],'status'=>$r['status']],query($db,"SELECT id,question,answer,status FROM natcon_faqs WHERE status IN ('active','published') ORDER BY sort_order,id")->fetchAll());}
+function mobilePages(\PDO $db): array {return array_map(static fn($r)=>['title'=>$r['title'],'description'=>$r['content']],query($db,"SELECT title,content FROM natcon_pages WHERE status='published' ORDER BY title")->fetchAll());}
+function mobileNotifications(\PDO $db,int $accountId): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'uid'=>(string)$r['account_id'],'datetime'=>$r['created_at'],'title'=>$r['title'],'description'=>$r['body']],query($db,'SELECT id,account_id,title,body,created_at FROM natcon_notifications WHERE account_id=? ORDER BY created_at DESC,id DESC',[$accountId])->fetchAll());}
 function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
 function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
 function event(array $c,?\PDO $db=null): array {

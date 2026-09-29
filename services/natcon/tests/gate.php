@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/bootstrap.php';
-use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken,mobileTicketHistory,mobileTicketInfo,mobileEventCard,mobileEventDetails,mobileTicketType,event};
+use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken,mobileTicketHistory,mobileTicketInfo,mobileEventCard,mobileEventDetails,mobileTicketType,event,toggleFavorite,favoriteEvents,mobileFaqs,mobilePages,mobileNotifications,now};
 $db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);migrate($db);$c=config();$checks=0;
 function delegateInput(string $name,string $email): array { return ['name'=>$name,'email'=>$email,'course'=>'Islamic Studies','institution'=>'Test University','level'=>'Graduate','whatsapp'=>'08000000000','calling_line'=>'','state_origin'=>'Osun','times_attended'=>'2']; }
 function check($yes,string $label): void {global $checks;if(!$yes)throw new RuntimeException($label);$checks++;}
@@ -17,6 +17,8 @@ $mobileType=mobileTicketType($db,$c);check((float)$mobileType['ticket_price']==(
 $account=createAccount($db,['name'=>'Account Test','email'=>'account@example.test','country_code'=>'+234','phone'=>'08001112222','password'=>'test-password-123']);
 check(strlen($account['access_token'])===64,'Account registration issues a mobile token');
 check(password_get_info(query($db,'SELECT password_hash FROM natcon_accounts WHERE id=?',[$account['id']])->fetchColumn())['algo']!==null,'Account password is hashed');
+$eventId=(string)$canonicalEvent;check(toggleFavorite($db,(int)$account['id'],$eventId),'Attendee can save canonical event to favorites');check(count(favoriteEvents($db,(int)$account['id']))===1,'Favorite list returns canonical event');check(!toggleFavorite($db,(int)$account['id'],$eventId)&&favoriteEvents($db,(int)$account['id'])===[],'Favorite toggle removes canonical event');
+query($db,'INSERT INTO natcon_faqs(question,answer,status,sort_order) VALUES(?,?,?,?)',['Test FAQ','Test answer','active',1]);check(mobileFaqs($db)[0]['question']==='Test FAQ','Published NATCON FAQ adapts to attendee client model');query($db,'INSERT INTO natcon_pages(slug,title,content,status) VALUES(?,?,?,?)',['privacy-test','Privacy','NATCON privacy notice','published']);check(mobilePages($db)[0]['description']==='NATCON privacy notice','Published NATCON pages adapt to attendee client model');query($db,'INSERT INTO natcon_notifications(account_id,title,body,created_at) VALUES(?,?,?,?)',[$account['id'],'Welcome','NATCON account ready',now()]);check(mobileNotifications($db,(int)$account['id'])[0]['description']==='NATCON account ready','Attendee notifications are scoped to account and use app model');
 $loggedIn=loginAccount($db,['ccode'=>'+234','mobile'=>'08001112222','password'=>'test-password-123']);
 check($loggedIn['id']===$account['id'],'Attendee phone and password login');
 rejects(fn()=>loginAccount($db,['ccode'=>'+234','mobile'=>'08001112222','password'=>'incorrect-password']),'Wrong attendee password rejected');
