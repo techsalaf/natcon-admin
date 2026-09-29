@@ -16,10 +16,9 @@ function mobileStaffType(string $role): string {return match($role){'admin'=>'Or
 try {
     $client=clean($_GET['client']??'',20);$endpoint=clean($_GET['endpoint']??'',100);
     if(!in_array($client,['user_api','orag_api'],true)||!preg_match('/^[A-Za-z0-9_/-]+\.php$/',$endpoint))mobileReply(['Result'=>'false','ResponseMsg'=>'Unknown mobile endpoint.'],404);
-    $c=config();$db=database($c);$raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
-    $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid request body.');
     $endpoint=strtolower($endpoint);
-
+    $c=config();$db=database($c);$raw=file_get_contents('php://input');$maxBody=$client==='orag_api'&&in_array($endpoint,['add_event.php','edit_event.php'],true)?7200000:100000;if(strlen($raw)>$maxBody)throw new InvalidArgumentException('Request is too large.');
+    $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid request body.');
     if($client==='user_api'&&$endpoint==='u_reg_user.php'){
         limit($db,'mobile-account-register:'.($_SERVER['REMOTE_ADDR']??''),10);
         $account=createAccount($db,$in);
@@ -155,6 +154,29 @@ try {
     if($client==='orag_api'&&$endpoint==='payout_review.php'){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if($staff['role']!=='finance')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Finance can review payout requests.'],403);
         $result=\Natcon\reviewPayout($db,(int)$staff['id'],(int)($in['payout_id']??0),clean($in['status']??'',20),clean($in['note']??'',1000));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout request updated.','data'=>$result]);
+    }
+    if($client==='orag_api'&&in_array($endpoint,['list_category.php','list_type.php','add_event.php','edit_event.php','add_type.php','edit_type.php'],true)){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        if($endpoint==='list_category.php'){
+            if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view event categories.'],403);
+            mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Categories loaded.','Categorydata'=>\Natcon\organizerCategories($db)]);
+        }
+        if($endpoint==='list_type.php'){
+            if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view ticket types.'],403);
+            mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket types loaded.','TypePricedata'=>\Natcon\organizerTicketTypes($db,clean($in['event_id']??'',32))]);
+        }
+        if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can manage NATCON events and ticket types.'],403);
+        $in['_staff_id']=(int)$staff['id'];
+        if(in_array($endpoint,['add_event.php','edit_event.php'],true)){
+            $id=$endpoint==='edit_event.php'?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;
+            if($endpoint==='edit_event.php'&&!$id)throw new InvalidArgumentException('Choose a valid NATCON event.');
+            $saved=\Natcon\saveOrganizerEvent($db,$in,$id?:null);
+            mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>$endpoint==='add_event.php'?'Event created in the NATCON catalogue.':'Event updated in the NATCON catalogue.','Eventdata'=>$saved]);
+        }
+        $id=$endpoint==='edit_type.php'?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;
+        if($endpoint==='edit_type.php'&&!$id)throw new InvalidArgumentException('Choose a valid ticket type.');
+        \Natcon\saveOrganizerTicketType($db,$in,$id?:null);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>$endpoint==='add_type.php'?'Ticket type created.':'Ticket type updated.']);
     }
     if($client==='orag_api'&&in_array($endpoint,['list_event.php','event_status_wise.php'],true)){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);

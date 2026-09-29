@@ -1326,7 +1326,6 @@ class _AddeventlistscreenState extends State<Addeventlistscreen> {
       File imageFile = File(addlistofeventController.path.toString());
       List<int> imageBytes = imageFile.readAsBytesSync();
       addlistofeventController.base64Image = base64Encode(imageBytes);
-      print("!!!!!!!!!++++++++++++${addlistofeventController.base64Image}");
       setState(() {});
     }
   }
@@ -1340,8 +1339,6 @@ class _AddeventlistscreenState extends State<Addeventlistscreen> {
       File imageFile = File(addlistofeventController.coverimagepath.toString());
       List<int> imageBytes = imageFile.readAsBytesSync();
       addlistofeventController.coverimagebase64Image = base64Encode(imageBytes);
-      print(
-          "!!!!!!!!!++++++++++++${addlistofeventController.coverimagebase64Image}");
       setState(() {});
     }
   }

@@ -180,8 +180,6 @@ class AddlistofeventController extends GetxController implements GetxService {
         body: jsonEncode(data),
       );
       // print("-------------Response=========" + response.body);
-      log("--------data--------${data} ");
-      print("++++++EVENT ADDED++++++++++++++ ${response.body}");
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         if (result["Result"] == "true") {
@@ -288,14 +286,11 @@ class AddlistofeventController extends GetxController implements GetxService {
         "img": base64Image,
         "cover": coverimagebase64Image
       };
-      print("............." + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.eventadd);
       var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
-      print("-------------Event Added Response-----------" + response.body);
-      print("++++++++++++++++++ ${map}");
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         if (result["Result"] == "true") {
