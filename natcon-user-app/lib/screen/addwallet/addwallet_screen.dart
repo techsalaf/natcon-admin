@@ -1,6 +1,5 @@
 // ignore_for_file: prefer_const_constructors, unnecessary_brace_in_string_interps, sort_child_properties_last, prefer_interpolation_to_compose_strings, avoid_print, unused_element
 
-import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +11,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../Api/config.dart';
 import '../../Api/data_store.dart';
-import '../../controller/paystack_controller.dart';
 import '../../controller/wallet_controller.dart';
 import '../../model/fontfamily_model.dart';
 import '../../utils/Colors.dart';
@@ -58,9 +56,6 @@ class _AddWalletScreenState extends State<AddWalletScreen> {
     walletController.getpaymentgatewayList();
   }
 
-  PayStackController payStackController = Get.put(PayStackController());
-  String? accessToken;
-  String? payerID;
 
   @override
   Widget build(BuildContext context) {
@@ -547,48 +542,42 @@ class _AddWalletScreenState extends State<AddWalletScreen> {
                         Get.back();
                         stripePayment();
                       } else if (paymenttital == "Paystack") {
-                        payStackController
-                            .paystackApi(
-                                email: getData
-                                    .read("UserLogin")["email"]
-                                    .toString(),
-                                amount: walletController.amount.text)
-                            .then(
-                          (value) {
-                            Map<String, dynamic> decodedValue =
-                                json.decode(value);
-                            print(
-                                "------------ ${decodedValue["data"]["authorization_url"]}");
-
-                            Get.to(PayStackWeb(
-                              initialUrl: decodedValue["data"]
-                                  ["authorization_url"],
-                              navigationDelegate:
-                                  (NavigationRequest request) async {
-                                final uri = Uri.parse(request.url);
-                                if (uri.queryParameters["status"] == null) {
-                                  accessToken = uri.queryParameters["token"];
-                                } else {
-                                  if (uri.queryParameters["status"] ==
-                                      "success") {
-                                    print(
-                                        '//////////////////////${uri.queryParameters["trxref"]}');
-                                    payerID = uri.queryParameters["trxref"];
-                                    print("*******************${payerID}");
-                                    Get.back();
-                                    walletController.getWalletUpdateData();
-                                    walletController.amount.text = "";
-                                    showToastMessage("Payment Successfully");
+                        try {
+                          final topup = await walletController.initializeNatconTopup();
+                          final authorizationUrl = topup['authorization_url']?.toString() ?? '';
+                          final reference = topup['reference']?.toString() ?? '';
+                          if (authorizationUrl.isEmpty || reference.isEmpty) {
+                            throw const FormatException('NATCON did not return a wallet payment link.');
+                          }
+                          Get.to(PayStackWeb(
+                            initialUrl: authorizationUrl,
+                            navigationDelegate: (NavigationRequest request) async {
+                              final callback = Uri.tryParse(request.url);
+                              final baseHost = Uri.parse(Config.imageUrl).host;
+                              if (callback != null &&
+                                  callback.host == baseHost &&
+                                  callback.path.endsWith('/conference/')) {
+                                try {
+                                  final credited = await walletController.verifyNatconTopup(reference);
+                                  Get.back();
+                                  if (credited) {
+                                    walletController.amount.clear();
+                                    showToastMessage('Wallet top-up verified.');
                                   } else {
-                                    Get.back();
-                                    showToastMessage("Payment Fail");
+                                    showToastMessage('NATCON has not confirmed this wallet payment yet. Check your wallet history shortly.');
                                   }
+                                } catch (error) {
+                                  Get.back();
+                                  showToastMessage(error.toString().replaceFirst('Exception: ', ''));
                                 }
-                                return NavigationDecision.navigate;
-                              },
-                            ));
-                          },
-                        );
+                                return NavigationDecision.prevent;
+                              }
+                              return NavigationDecision.navigate;
+                            },
+                          ));
+                        } catch (error) {
+                          showToastMessage(error.toString().replaceFirst('Exception: ', ''));
+                        }
 
                         // String key = razorpaykey.split(",").first;
                         // print("**********(Key)*********" + key.toString());

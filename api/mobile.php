@@ -66,6 +66,15 @@ try {
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Notifications loaded.','NotificationData'=>\Natcon\mobileNotifications($db,(int)$account['id'])]);
     }
+    if($client==='user_api'&&$endpoint==='u_wallet_report.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Wallet history loaded.','wallet'=>number_format((int)$account['wallet_balance_kobo']/100,2,'.',''),'Walletitem'=>\Natcon\walletHistory($db,(int)$account['id'])]);
+    }
+    if($client==='user_api'&&$endpoint==='u_paymentgateway.php'){
+        $methods=$c['secret']?[['id'=>'paystack','title'=>'Paystack','img'=>'','attributes'=>'','status'=>'1','subtitle'=>'Secure NATCON wallet top-up','p_show'=>'1']]:[];
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Available payment methods loaded.','paymentdata'=>$methods]);
+    }
+    if($client==='user_api'&&$endpoint==='u_wallet_up.php')mobileReply(['Result'=>'false','ResponseMsg'=>'Wallet credits are added only after NATCON verifies your payment.'],410);
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
         $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
         $account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null);
@@ -93,7 +102,7 @@ try {
             'delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),
             'paid'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status='paid'")->fetchColumn(),
             'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),
-            'revenue'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),
+            'revenue'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),
             'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),
         ];
         $labels=['Total Delegates'=>$totals['delegates'],'Paid Delegates'=>$totals['paid'],'Checked In'=>$totals['checked_in'],'Earning'=>number_format($totals['revenue']/100,2),'Pending Transfers'=>$totals['pending_transfers']];

@@ -747,7 +747,13 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         account: Map<String, dynamic>.from(account),
         delegates: delegates,
         couponCode: couponCode,
+        useWallet: status == true,
       );
+      if (order['status'] == 'paid') {
+        await walletController.getWalletReportData();
+        await OrderPlacedSuccessfully();
+        return;
+      }
       final amountKobo = (order['amount_kobo'] as num?)?.toInt() ?? 0;
       final confirm = await Get.dialog<bool>(AlertDialog(
         title: const Text('Confirm NATCON total'),

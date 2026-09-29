@@ -12,7 +12,7 @@ try {
     $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db));
     $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','ticket','qr','dashboard','delegates','transfers','export','audit','account_session','account_profile','account_orders'];
+    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','account_session','account_profile','account_orders'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
     elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
     elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
@@ -21,7 +21,10 @@ try {
     if($action==='account_session'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}unset($account['token_id']);respond($account);}
     if($action==='account_profile'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if($method==='GET'){unset($account['token_id']);respond($account);}respond(updateAccountProfile($db,(int)$account['id'],$in));}
     if($action==='account_orders'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}respond(query($db,'SELECT reference,amount_kobo,currency,status,created_at,paid_at FROM natcon_orders WHERE account_id=? ORDER BY created_at DESC',[$account['id']])->fetchAll());}
+    if($action==='account_wallet'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}respond(['wallet_balance_kobo'=>(int)$account['wallet_balance_kobo'],'ledger'=>\Natcon\walletHistory($db,(int)$account['id'])]);}
     if($action==='account_logout'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE id=?',[now(),$account['token_id']]);respond(['logged_out'=>true]);}
+    if($action==='wallet_initialize'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}limit($db,'wallet-topup:'.$account['id'],10,3600);respond(\Natcon\initializeWalletTopup($db,$c,(int)$account['id'],(int)($in['amount_kobo']??0)));}
+    if($action==='wallet_verify'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}$ref=clean($_GET['reference']??'',64);limit($db,'wallet-verify:'.$account['id'],20,300);$payment=gateway($c,'transaction/verify/'.rawurlencode($ref));respond(\Natcon\confirmWalletTopup($db,(int)$account['id'],$ref,$payment));}
     if($action==='register'){limit($db,'register:'.($_SERVER['REMOTE_ADDR']??''),20);$account=accountForToken($db);respond(register($db,$c,$in,$account?(int)$account['id']:null));}
     if($action==='order')respond(order($db,clean($_GET['reference']??''),clean($_GET['token']??'')));
     if($action==='payment_initialize'){
@@ -61,7 +64,7 @@ try {
     if($method==='POST'&&!isset($user['token_id'])&&!hash_equals($_SESSION['csrf']??'',$_SERVER['HTTP_X_CSRF_TOKEN']??'')){http_response_code(403);throw new InvalidArgumentException('Session verification failed. Refresh and try again.');}
     if($action==='logout'){if(isset($user['token_id']))query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE id=?',[now(),$user['token_id']]);$_SESSION=[];session_destroy();respond(['logged_out'=>true]);}
     if($action==='dashboard'){
-        respond(['total_delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),'paid_delegates'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON d.reference=o.reference WHERE o.status='paid'")->fetchColumn(),'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),'revenue_kobo'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),'chapters'=>query($db,'SELECT chapter,COUNT(*) AS total FROM natcon_delegates GROUP BY chapter ORDER BY total DESC')->fetchAll()]);
+        respond(['total_delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),'paid_delegates'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON d.reference=o.reference WHERE o.status='paid'")->fetchColumn(),'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),'revenue_kobo'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),'chapters'=>query($db,'SELECT chapter,COUNT(*) AS total FROM natcon_delegates GROUP BY chapter ORDER BY total DESC')->fetchAll()]);
     }
     if($action==='delegates'||$action==='export'){
         $sql='SELECT d.*,o.status,o.amount_kobo,o.payer_name,o.payer_email,CASE WHEN EXISTS(SELECT 1 FROM natcon_checkins c WHERE c.delegate_id=d.id) THEN 1 ELSE 0 END AS checked_in FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE 1=1';$args=[];
@@ -88,10 +91,11 @@ try {
         $ref=clean($in['reference']??'');$status=clean($in['status']??'',20);$reason=clean($in['reason']??'',1000);
         if(!in_array($status,['cancelled','refunded'],true)||strlen($reason)<10)throw new InvalidArgumentException('Choose a valid status and enter the reconciliation reason.');
         $db->beginTransaction();try{
-            $o=query($db,'SELECT status,coupon_id FROM natcon_orders WHERE reference=?',[$ref])->fetch();
+            $o=query($db,'SELECT status,coupon_id,account_id FROM natcon_orders WHERE reference=?',[$ref])->fetch();
             if(!$o||in_array($o['status'],['cancelled','refunded'],true))throw new InvalidArgumentException('This registration cannot be changed.');
             query($db,'UPDATE natcon_orders SET status=? WHERE reference=?',[$status,$ref]);
             if($o['coupon_id'])\Natcon\releaseCouponRedemption($db,(int)$o['coupon_id'],$ref);
+            if($o['account_id'])\Natcon\releaseWalletReservation($db,(int)$o['account_id'],$ref);
             audit($db,(string)$user['id'],'order_'.$status,$ref,['reason'=>$reason]);$db->commit();
         }catch(Throwable $e){$db->rollBack();throw $e;}
         respond(['status'=>$status]);
