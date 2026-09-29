@@ -571,7 +571,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'NATCON confirms the final price on the server before payment. The amount shown above is an estimate.',
+                      'NATCON confirms the final price on the server before payment. The amount shown above is an estimate. Wallet and coupon balances are not applied to this checkout yet.',
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                     SizedBox(
