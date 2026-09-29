@@ -456,13 +456,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _openGallery(BuildContext context) async {
-    final pickedFile =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+    final pickedFile = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
     if (pickedFile != null) {
       path = pickedFile.path;
       setState(() {});
       File imageFile = File(path.toString());
-      List<int> imageBytes = imageFile.readAsBytesSync();
+      final imageBytes = await imageFile.readAsBytes();
       base64Image = base64Encode(imageBytes);
       loginController.updateProfileImage(base64Image);
       setState(() {});

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,mobileTicketHistory,mobileTicketInfo,mobileEventCard,mobileEventDetails,mobileTicketType};
+use function Natcon\{config,database,query,clean,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,updateAccountProfileImage,mobileTicketHistory,mobileTicketInfo,mobileEventCard,mobileEventDetails,mobileTicketType};
 
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -17,7 +17,7 @@ try {
     $client=clean($_GET['client']??'',20);$endpoint=clean($_GET['endpoint']??'',100);
     if(!in_array($client,['user_api','orag_api'],true)||!preg_match('#^[A-Za-z0-9_/-]+\.php$#',$endpoint))mobileReply(['Result'=>'false','ResponseMsg'=>'Unknown mobile endpoint.'],404);
     $endpoint=strtolower($endpoint);
-    $c=config();$db=database($c);$raw=file_get_contents('php://input');$maxBody=$client==='orag_api'&&in_array($endpoint,['add_event.php','edit_event.php'],true)?7200000:($client==='orag_api'&&in_array($endpoint,['add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'],true)?4000000:100000);if(strlen($raw)>$maxBody)throw new InvalidArgumentException('Request is too large.');
+    $c=config();$db=database($c);$raw=file_get_contents('php://input');$maxBody=$client==='orag_api'&&in_array($endpoint,['add_event.php','edit_event.php'],true)?7200000:(($client==='orag_api'&&in_array($endpoint,['add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'],true))||($client==='user_api'&&$endpoint==='pro_image.php')?4000000:100000);if(strlen($raw)>$maxBody)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid request body.');
     if($client==='user_api'&&$endpoint==='u_reg_user.php'){
         limit($db,'mobile-account-register:'.($_SERVER['REMOTE_ADDR']??''),10);
@@ -231,6 +231,7 @@ try {
         $updated=updateAccountProfile($db,(int)$account['id'],$in);
         mobileReply(['Result'=>'true','ResponseMsg'=>'Profile updated.','UserLogin'=>mobileAccountPayload($updated)]);
     }
+    if($client==='user_api'&&$endpoint==='pro_image.php'){$account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if((string)($in['uid']??'')!==(string)$account['id'])mobileReply(['Result'=>'false','ResponseMsg'=>'Account does not match this session.'],403);limit($db,'profile-image:'.$account['id'],12,3600);$updated=updateAccountProfileImage($db,(int)$account['id'],$in);mobileReply(['Result'=>'true','ResponseMsg'=>'Profile photo updated.','UserLogin'=>mobileAccountPayload($updated)]);}
     if($client==='user_api'&&$endpoint==='ticket_status_wise.php'){
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Tickets loaded.','order_data'=>mobileTicketHistory($db,(int)$account['id'],$c)]);

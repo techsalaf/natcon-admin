@@ -62,6 +62,8 @@ async function ready(url, child) {
       const contentList=await fetch(`${base}/api/natcon.php?action=event_content&kind=artist`,{headers:{Cookie:cookie}});assert.equal((await contentList.json()).data[0].title,'HTTP Speaker');
       const imageResponse=await fetch(`${base}/api/natcon.php?action=save_event_content`,{method:'POST',headers:{'content-type':'application/json',Cookie:cookie,'X-CSRF-Token':login.data.csrf},body:JSON.stringify({kind:'gallery',event_id:eventId,title:'HTTP gallery',img:'iVBORw0KGgo=',status:'1'})});assert.equal(imageResponse.status,200,JSON.stringify(await imageResponse.clone().json()));const detailResponse=await fetch(`${base}/api/mobile.php?client=user_api&endpoint=u_event_data.php`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({event_id:eventId})});const detailText=await detailResponse.text();assert.equal(detailResponse.status,200,detailText);const mediaEvent=JSON.parse(detailText),mediaUrl=mediaEvent.EventData.event_gallery[0],assetId=mediaUrl.match(/asset_id=(\d+)/)?.[1];assert(assetId);const servedMedia=await fetch(`${base}/api/mobile-media.php?asset_id=${assetId}`);assert.equal(servedMedia.status,200);assert.equal(servedMedia.headers.get('content-type'),'image/png');
       const forbiddenContent=await fetch(`${base}/api/natcon.php?action=save_event_content`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({kind:'facility',event_id:eventId,title:'Unauthorized'})});assert.equal(forbiddenContent.status,401);
+      const attendeeResponse=await fetch(`${base}/api/mobile.php?client=user_api&endpoint=u_reg_user.php`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name:'HTTP Attendee',email:'photo@example.test',ccode:'+234',mobile:'08000008888',password:'photo-test-password'})});const attendee=await attendeeResponse.json();assert.equal(attendeeResponse.status,200,JSON.stringify(attendee));const accessToken=attendee.AccessToken,uid=attendee.UserLogin.id;
+      const photoResponse=await fetch(`${base}/api/mobile.php?client=user_api&endpoint=pro_image.php`,{method:'POST',headers:{'content-type':'application/json',Authorization:`Bearer ${accessToken}`},body:JSON.stringify({uid,img:'iVBORw0KGgo='})});const photo=await photoResponse.json();assert.equal(photoResponse.status,200,JSON.stringify(photo));assert.match(photo.UserLogin.pro_pic,/account_asset_id=/);const photoAssetId=photo.UserLogin.pro_pic.match(/account_asset_id=(\d+)/)[1];const photoMedia=await fetch(`${base}/api/mobile-media.php?account_asset_id=${photoAssetId}`);assert.equal(photoMedia.status,200);assert.equal(photoMedia.headers.get('content-type'),'image/png');
 
       const checkoutResponse = await fetch(`${base}/api/natcon.php?action=register`, {
         method: 'POST', headers: {'content-type':'application/json'},
@@ -72,7 +74,7 @@ async function ready(url, child) {
       assert.equal(checkout.data.amount_kobo, 321050);
       assert.equal(checkout.data.event_id, Number(eventId));
       assert.equal(String(checkout.data.ticket_type_id), selected.data.ticket_types[0].typeid);
-      console.log('PASS public event checkout and Admin session/CSRF coupon management HTTP flows');
+      console.log('PASS public event checkout, Admin session/CSRF event content, and authenticated attendee photo HTTP flows');
     } finally { server.kill(); }
   } finally { fs.rmSync(temp, {recursive:true,force:true}); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
