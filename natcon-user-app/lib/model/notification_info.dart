@@ -47,6 +47,7 @@ class NotificationDatum {
   DateTime datetime;
   String title;
   String description;
+  bool isRead;
 
   NotificationDatum({
     required this.id,
@@ -54,6 +55,7 @@ class NotificationDatum {
     required this.datetime,
     required this.title,
     required this.description,
+    this.isRead = false,
   });
 
   factory NotificationDatum.fromJson(Map<String, dynamic> json) =>
@@ -63,6 +65,7 @@ class NotificationDatum {
         datetime: DateTime.parse(json["datetime"]),
         title: json["title"],
         description: json["description"],
+        isRead: json["is_read"] == true || json["is_read"] == 1,
       );
 
   Map<String, dynamic> toJson() => {
@@ -71,5 +74,6 @@ class NotificationDatum {
         "datetime": datetime.toIso8601String(),
         "title": title,
         "description": description,
+        "is_read": isRead,
       };
 }

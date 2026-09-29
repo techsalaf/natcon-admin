@@ -54,11 +54,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
                           itemCount: notificationController
                               .notificationInfo?.notificationData.length,
                           itemBuilder: (context, index) {
+                            final notification = notificationController.notificationInfo!.notificationData[index];
                             String time =
                                 "${DateFormat.jm().format(DateTime.parse("2023-03-20T${notificationController.notificationInfo?.notificationData[index].datetime.toString().split(" ").last}"))}";
                             return Container(
                               margin: EdgeInsets.all(10),
                               child: ListTile(
+                                onTap: notification.isRead
+                                    ? null
+                                    : () => notificationController.markAsRead(notification.id),
                                 leading: Container(
                                   height: 60,
                                   width: 60,
@@ -78,7 +82,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                       "",
                                   style: TextStyle(
                                     fontSize: 17,
-                                    fontFamily: FontFamily.gilroyBold,
+                                    fontFamily: notification.isRead ? FontFamily.gilroyMedium : FontFamily.gilroyBold,
                                     color: BlackColor,
                                   ),
                                 ),

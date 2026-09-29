@@ -49,6 +49,7 @@ class Config {
   static const String referAndEarn = "getdata.php";
 
   static const String notificationApi = "notification.php";
+  static const String notificationRead = "notification_read.php";
 
   static const String catWiseEvent = "u_cat_event.php";
   static const String orderReview = "rate_update.php";

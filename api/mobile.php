@@ -96,6 +96,11 @@ try {
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Notifications loaded.','NotificationData'=>\Natcon\mobileNotifications($db,(int)$account['id'])]);
     }
+    if($client==='user_api'&&$endpoint==='notification_read.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        $updated=\Natcon\markMobileNotificationRead($db,(int)$account['id'],clean($in['id']??'',16));
+        mobileReply(['Result'=>'true','ResponseMsg'=>$updated?'Notification marked as read.':'Notification already read or unavailable.','is_read'=>$updated]);
+    }
     if($client==='user_api'&&$endpoint==='u_wallet_report.php'){
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Wallet history loaded.','wallet'=>number_format((int)$account['wallet_balance_kobo']/100,2,'.',''),'Walletitem'=>\Natcon\walletHistory($db,(int)$account['id'])]);

@@ -274,7 +274,11 @@ function favoriteEvents(\PDO $db,int $accountId): array {
 }
 function mobileFaqs(\PDO $db): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'store_id'=>null,'question'=>$r['question'],'answer'=>$r['answer'],'status'=>$r['status']],query($db,"SELECT id,question,answer,status FROM natcon_faqs WHERE status IN ('active','published') ORDER BY sort_order,id")->fetchAll());}
 function mobilePages(\PDO $db): array {return array_map(static fn($r)=>['title'=>$r['title'],'description'=>$r['content']],query($db,"SELECT title,content FROM natcon_pages WHERE status='published' ORDER BY title")->fetchAll());}
-function mobileNotifications(\PDO $db,int $accountId): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'uid'=>(string)$r['account_id'],'datetime'=>$r['created_at'],'title'=>$r['title'],'description'=>$r['body']],query($db,'SELECT id,account_id,title,body,created_at FROM natcon_notifications WHERE account_id=? ORDER BY created_at DESC,id DESC',[$accountId])->fetchAll());}
+function mobileNotifications(\PDO $db,int $accountId): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'uid'=>(string)$r['account_id'],'datetime'=>$r['created_at'],'title'=>$r['title'],'description'=>$r['body'],'is_read'=>$r['read_at']!==null],query($db,'SELECT id,account_id,title,body,created_at,read_at FROM natcon_notifications WHERE account_id=? ORDER BY created_at DESC,id DESC',[$accountId])->fetchAll());}
+function markMobileNotificationRead(\PDO $db,int $accountId,string $notificationId): bool {
+    if(!preg_match('/^[1-9]\d{0,9}$/',$notificationId))throw new \InvalidArgumentException('Choose a valid notification.');
+    return query($db,'UPDATE natcon_notifications SET read_at=? WHERE id=? AND account_id=? AND read_at IS NULL',[now(),(int)$notificationId,$accountId])->rowCount()>0;
+}
 function walletHistory(\PDO $db,int $accountId): array {
     return array_map(static function($row){$credit=$row['direction']==='credit';return ['message'=>$row['description'],'status'=>$credit?'Credit':'Debit','amt'=>number_format((int)$row['amount_kobo']/100,2,'.',''),'tdate'=>$row['created_at']];},query($db,'SELECT direction,amount_kobo,description,created_at FROM natcon_wallet_ledger WHERE account_id=? AND status IN (\'paid\',\'completed\') ORDER BY id DESC',[$accountId])->fetchAll());
 }
