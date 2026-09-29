@@ -19,7 +19,7 @@ const checks = [
   ['attendee history and ticket detail are routed through account-owned service functions', router.includes("ticket_status_wise.php") && router.includes('mobileTicketHistory($db,(int)$account[\'id\'],$c)') && router.includes('mobileTicketInfo($db,(int)$account[\'id\'],$token,$c)')],
   ['attendee checkout creates a NATCON order and initializes server-side Paystack', attendeeCheckout.includes('createNatconOrder(') && attendeeCheckout.includes('initializeNatconPayment(') && attendeeCheckout.includes('verifyNatconPayment(')],
   ['checkout collects all required delegate fields and requires privacy consent before request', ['name','email','course','institution','level','whatsapp','calling_line','state_origin','times_attended'].every(field => delegateForm.includes(`'${field}'`)) && delegateForm.includes('_consent') && attendeeApi.includes("'consent': true")],
-  ['attendee event discovery, detail and ticket-price routes use NATCON service data', ['u_home_data.php','u_event_data.php','u_event_type_price.php'].every(endpoint => router.includes(endpoint)) && router.includes('mobileEventCard($c)') && router.includes('mobileEventDetails($db,$c') && router.includes('mobileTicketType($c)')],
+  ['attendee event discovery, detail and ticket-price routes use NATCON service data', ['u_home_data.php','u_event_data.php','u_event_type_price.php'].every(endpoint => router.includes(endpoint)) && router.includes('mobileEventCard($db,$c)') && router.includes('mobileEventDetails($db,$c') && router.includes('mobileTicketType($db,$c)')],
 ];
 for (const [name, passed] of checks) console.log(`${passed ? 'PASS' : 'FAIL'} ${name}`);
 if (checks.some(([, passed]) => !passed)) process.exitCode = 1;

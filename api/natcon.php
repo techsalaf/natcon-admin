@@ -9,8 +9,8 @@ function respond($data): never {echo json_encode(['ok'=>true,'data'=>$data],JSON
 function requireStaff(array $roles): array {global $db;$user=$_SESSION['user']??null;if(!$user)$user=staffForToken($db);if(!$user||(!isset($user['token_id'])&&($_SESSION['last_active']??0)<time()-3600)){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if(!in_array($user['role'],$roles,true)){http_response_code(403);throw new InvalidArgumentException('Your role cannot perform this action.');}if(!isset($user['token_id']))$_SESSION['last_active']=time();return $user;}
 try {
     $c=config();$action=clean($_GET['action']??'event',50);$method=$_SERVER['REQUEST_METHOD'];
-    if($action==='event'&&$method==='GET')respond(event($c));
-    $db=database($c);$raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
+    $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db));
+    $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
     $getActions=['session','order','payment_verify','ticket','qr','dashboard','delegates','transfers','export','audit','account_session','account_profile','account_orders'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
@@ -44,7 +44,7 @@ try {
         if(!filter_var($email,FILTER_VALIDATE_EMAIL))throw new InvalidArgumentException('Enter a valid email address.');
         recover($db,$c,$email);respond(['message'=>'If a registration matches this email, a secure link will be sent.']);
     }
-    if($action==='ticket')respond(delegate($db,clean($_GET['token']??''))+['event'=>event($c)]);
+    if($action==='ticket')respond(delegate($db,clean($_GET['token']??''))+['event'=>event($c,$db)]);
     if($action==='qr'){$d=delegate($db,clean($_GET['token']??''));require_once dirname(__DIR__).'/qr/phpqrcode.php';header('Content-Type: image/png');\QRcode::png($d['ticket_token'],false,QR_ECLEVEL_M,7,2);exit;}
     if($action==='mobile_login'){
         limit($db,'mobile-login:'.($_SERVER['REMOTE_ADDR']??''),10);$u=query($db,'SELECT * FROM natcon_staff WHERE email=?',[strtolower(clean($in['email']??''))])->fetch();

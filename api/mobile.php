@@ -37,18 +37,18 @@ try {
         mobileReply(['Result'=>$exists?'false':'true','ResponseMsg'=>$exists?'Phone number already has an account.':'Phone number is available.']);
     }
     if($client==='user_api'&&$endpoint==='u_home_data.php'){
-        $account=accountForToken($db);$card=mobileEventCard($c);$today=(new DateTimeImmutable('now',new DateTimeZone('Africa/Lagos')))->format('Y-m-d');$open=$today<=$c['end_date'];
+        $account=accountForToken($db);$canonical=\Natcon\event($c,$db);$card=mobileEventCard($db,$c);$today=(new DateTimeImmutable('now',new DateTimeZone('Africa/Lagos')))->format('Y-m-d');$open=$today<=$canonical['end_date'];
         $wallet=$account?(int)$account['wallet_balance_kobo']/100:0;
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>[],'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>[],'wallet'=>(string)$wallet,'upcoming_event'=>$open?[$card]:[],'nearby_event'=>[],'this_month_event'=>$open?[$card]:[]]]);
     }
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
-        $eventId=clean($in['event_id']??'',64);if(!in_array($eventId,['NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
+        $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
         $account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>[]]);
     }
     if($client==='user_api'&&$endpoint==='u_event_type_price.php'){
-        $eventId=clean($in['event_id']??'',64);if(!in_array($eventId,['NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket price loaded.','EventTypePrice'=>[mobileTicketType($c)]]);
+        $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket price loaded.','EventTypePrice'=>[mobileTicketType($db,$c)]]);
     }
     if($client==='orag_api'&&$endpoint==='u_login_user.php'){
         limit($db,'mobile-staff-login:'.($_SERVER['REMOTE_ADDR']??''),10);

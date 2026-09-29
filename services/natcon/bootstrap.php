@@ -73,6 +73,7 @@ function migrate(\PDO $db): void {
         if(!in_array($column,$columns,true)) $db->exec("ALTER TABLE natcon_delegates ADD COLUMN $column $type");
     $insert=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INSERT OR IGNORE':'INSERT IGNORE';
     $db->exec("$insert INTO natcon_locks(name,value) VALUES('registration',0)");
+    seedPrimaryConference($db,config());
 }
 function now(): string { return gmdate('Y-m-d H:i:s'); }
 function query(\PDO $db,string $sql,array $args=[]): \PDOStatement { $q=$db->prepare($sql);$q->execute($args);return $q; }
@@ -109,28 +110,55 @@ function updateAccountProfile(\PDO $db,int $id,array $in): array {
     return query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();
 }
 function mobileTicketHistory(\PDO $db,int $accountId,array $c): array {
-    $orders=query($db,"SELECT o.reference,o.created_at,o.paid_at,d.ticket_token,d.name FROM natcon_orders o JOIN natcon_delegates d ON d.reference=o.reference WHERE o.account_id=? AND o.status='paid' ORDER BY o.created_at DESC,d.id ASC",[$accountId])->fetchAll();
-    $data=[];foreach($orders as $ticket)$data[]=['event_id'=>'NATCON-2026','event_title'=>$c['name'],'event_img'=>'','event_sdate'=>$c['start_date'],'event_place_name'=>$c['venue'],'ticket_id'=>$ticket['ticket_token'],'total_ticket'=>'1','ticket_type'=>'Delegate','book_mintues'=>0];
+    $event=primaryConference($db);$orders=query($db,"SELECT o.reference,o.created_at,o.paid_at,d.ticket_token,d.name,tt.label FROM natcon_orders o JOIN natcon_delegates d ON d.reference=o.reference LEFT JOIN natcon_ticket_types tt ON tt.id=o.ticket_type_id WHERE o.account_id=? AND o.status='paid' ORDER BY o.created_at DESC,d.id ASC",[$accountId])->fetchAll();
+    $data=[];foreach($orders as $ticket)$data[]=['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_sdate'=>substr((string)$event['starts_at'],0,10),'event_place_name'=>$event['venue'],'ticket_id'=>$ticket['ticket_token'],'total_ticket'=>'1','ticket_type'=>$ticket['label']?:'Delegate','book_mintues'=>0];
     return $data;
 }
 function mobileTicketInfo(\PDO $db,int $accountId,string $token,array $c): array {
     $ticket=query($db,"SELECT d.*,o.payer_name,o.payer_email,o.payer_phone,o.amount_kobo,o.bank_reference,o.reference,o.status FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE d.ticket_token=? AND o.account_id=? AND o.status='paid'",[$token,$accountId])->fetch();
     if(!$ticket)throw new \InvalidArgumentException('Paid ticket not found in this account.');
     $paidCount=max(1,(int)query($db,'SELECT COUNT(*) FROM natcon_delegates WHERE reference=?',[$ticket['reference']])->fetchColumn());$unit=round((int)$ticket['amount_kobo']/$paidCount);$amount=number_format($unit/100,2,'.','');
-    return ['ticket_id'=>$ticket['ticket_token'],'ticket_title'=>$c['name'],'start_time'=>$c['start_date'],'event_address'=>$c['venue'],'event_address_title'=>$c['venue'],'event_latitude'=>'0','event_longtitude'=>'0','sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_title'=>'The Achiever Ambassadors Islamic Foundation','qrcode'=>$ticket['ticket_token'],'unique_code'=>$ticket['reference'],'ticket_username'=>$ticket['name'],'ticket_mobile'=>$ticket['whatsapp']?:$ticket['phone'],'ticket_email'=>$ticket['email'],'ticket_rate'=>'0','ticket_type'=>'Delegate','total_ticket'=>'1','ticket_subtotal'=>$amount,'ticket_cou_amt'=>'0','ticket_wall_amt'=>'0','ticket_tax'=>'0','ticket_total_amt'=>$amount,'ticket_p_method'=>$ticket['bank_reference']?'Bank Transfer':'Paystack','ticket_transaction_id'=>$ticket['bank_reference']?:$ticket['reference'],'ticket_status'=>'paid'];
+    $event=primaryConference($db);return ['ticket_id'=>$ticket['ticket_token'],'ticket_title'=>$event['title'],'start_time'=>substr((string)$event['starts_at'],0,10),'event_address'=>$event['venue'],'event_address_title'=>$event['venue'],'event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_title'=>'The Achiever Ambassadors Islamic Foundation','qrcode'=>$ticket['ticket_token'],'unique_code'=>$ticket['reference'],'ticket_username'=>$ticket['name'],'ticket_mobile'=>$ticket['whatsapp']?:$ticket['phone'],'ticket_email'=>$ticket['email'],'ticket_rate'=>'0','ticket_type'=>'Delegate','total_ticket'=>'1','ticket_subtotal'=>$amount,'ticket_cou_amt'=>'0','ticket_wall_amt'=>'0','ticket_tax'=>'0','ticket_total_amt'=>$amount,'ticket_p_method'=>$ticket['bank_reference']?'Bank Transfer':'Paystack','ticket_transaction_id'=>$ticket['bank_reference']?:$ticket['reference'],'ticket_status'=>'paid'];
 }
-function mobileEventCard(array $c): array {return ['event_id'=>'NATCON-2026','event_title'=>$c['name'],'event_img'=>'','event_sdate'=>$c['start_date'],'event_place_name'=>$c['venue']];}
+function seedPrimaryConference(\PDO $db,array $c): int {
+    $event=query($db,"SELECT id FROM natcon_events WHERE slug='natcon-2026'")->fetch();
+    if(!$event){query($db,'INSERT INTO natcon_events(owner_staff_id,category_id,title,slug,description,venue,starts_at,ends_at,currency,status,created_at) VALUES(NULL,NULL,?,?,?,?,?,?,?,?,?)',[$c['name'],'natcon-2026',$c['theme'],$c['venue'],$c['start_date'].' 00:00:00',$c['end_date'].' 23:59:59','NGN','published',now()]);$id=(int)$db->lastInsertId();}
+    else $id=(int)$event['id'];
+    $earlyEnd=$c['earlybird_end'].' 23:59:59';$standardStart=gmdate('Y-m-d H:i:s',strtotime($earlyEnd.' UTC')+1);
+    foreach([['NATCON Early Bird',700000,null,$earlyEnd],['NATCON Delegate',800000,$standardStart,null]] as [$label,$price,$start,$end]){
+        $exists=query($db,'SELECT id FROM natcon_ticket_types WHERE event_id=? AND label=?',[$id,$label])->fetchColumn();
+        if(!$exists)query($db,'INSERT INTO natcon_ticket_types(event_id,label,description,price_kobo,capacity,sales_start,sales_end,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$id,$label,'Personal admission ticket for NATCON 2026.',$price,(int)$c['capacity'],$start,$end,'active',now()]);
+    }
+    return $id;
+}
+function primaryConference(\PDO $db): array {
+    $row=query($db,"SELECT * FROM natcon_events WHERE slug='natcon-2026' AND status='published'")->fetch();
+    if(!$row)throw new \RuntimeException('The canonical NATCON 2026 event is not seeded. Run the NATCON migration.');
+    return $row;
+}
+function activeTicketType(\PDO $db,int $eventId): array {
+    $at=now();$row=query($db,"SELECT * FROM natcon_ticket_types WHERE event_id=? AND status='active' AND (sales_start IS NULL OR sales_start<=?) AND (sales_end IS NULL OR sales_end>=?) ORDER BY price_kobo ASC,id ASC LIMIT 1",[$eventId,$at,$at])->fetch();
+    if(!$row)throw new \InvalidArgumentException('NATCON ticket sales are not open. Contact the organizers.');
+    return $row;
+}
+function mobileEventCard(\PDO $db,array $c): array {$event=primaryConference($db);return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_sdate'=>substr((string)$event['starts_at'],0,10),'event_place_name'=>$event['venue']];}
 function mobileEventDetails(\PDO $db,array $c,?int $accountId=null): array {
-    $paid=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status='paid'")->fetchColumn();$cap=(int)$c['capacity'];
-    return ['event_id'=>'NATCON-2026','event_title'=>$c['name'],'event_img'=>'','event_cover_img'=>[],'event_sdate'=>$c['start_date'],'event_time_day'=>'October 1–4, 2026','event_address_title'=>$c['venue'],'event_address'=>$c['venue'],'event_latitude'=>'0','event_longtitude'=>'0','event_disclaimer'=>'Each delegate must present their own paid NATCON ticket.','event_about'=>$c['theme'],'event_tags'=>['Faith','Knowledge','Community'],'event_video_urls'=>[],'ticket_price'=>number_format(((int)event($c)['price_kobo'])/100,2,'.',''),'IS_BOOKMARK'=>0,'sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_name'=>'The Achiever Ambassadors Islamic Foundation','sponsore_mobile'=>'','total_ticket'=>$cap?:99999,'is_joined'=>$accountId?(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE account_id=? AND status='paid'",[$accountId])->fetchColumn():0,'total_book_ticket'=>$paid,'member_list'=>[]];
+    $event=primaryConference($db);$type=activeTicketType($db,(int)$event['id']);$paid=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status='paid' AND o.event_id=?",[$event['id']])->fetchColumn();$cap=(int)$type['capacity'];$favorite=0;
+    if($accountId)$favorite=(int)query($db,'SELECT COUNT(*) FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();
+    return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_cover_img'=>[],'event_sdate'=>substr((string)$event['starts_at'],0,10),'event_time_day'=>'October 1–4, 2026','event_address_title'=>$event['venue'],'event_address'=>$event['venue'],'event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','event_disclaimer'=>'Each delegate must present their own paid NATCON ticket.','event_about'=>$event['description'],'event_tags'=>['Faith','Knowledge','Community'],'event_video_urls'=>[],'ticket_price'=>number_format((int)$type['price_kobo']/100,2,'.',''),'IS_BOOKMARK'=>$favorite?1:0,'sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_name'=>'The Achiever Ambassadors Islamic Foundation','sponsore_mobile'=>'','total_ticket'=>$cap?:99999,'is_joined'=>$accountId?(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE account_id=? AND status='paid' AND event_id=?",[$accountId,$event['id']])->fetchColumn():0,'total_book_ticket'=>$paid,'member_list'=>[]];
 }
-function mobileTicketType(array $c): array {
-    $price=number_format(((int)event($c)['price_kobo'])/100,2,'.','');$capacity=(int)$c['capacity'];
-    return ['typeid'=>'NATCON-GENERAL','ticket_type'=>'NATCON Delegate','ticket_price'=>$price,'TotalTicket'=>$capacity?:99999,'description'=>'One personal ticket for NATCON 2026.','remainTicket'=>$capacity?:99999,'tPrice'=>$price];
+function mobileTicketType(\PDO $db,array $c): array {
+    $event=primaryConference($db);$type=activeTicketType($db,(int)$event['id']);$capacity=(int)$type['capacity'];$sold=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.ticket_type_id=? AND o.status IN ('paid','pending','awaiting_review')",[$type['id']])->fetchColumn();$remaining=$capacity>0?max(0,$capacity-$sold):99999;$price=number_format((int)$type['price_kobo']/100,2,'.','');
+    return ['typeid'=>(string)$type['id'],'ticket_type'=>$type['label'],'ticket_price'=>$price,'TotalTicket'=>$capacity?:99999,'description'=>$type['description']??'','remainTicket'=>$remaining,'tPrice'=>$price];
 }
 function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
 function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
-function event(array $c): array { $date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']))+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!=='']; }
+function event(array $c,?\PDO $db=null): array {
+    $base=array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']));
+    if(!$db){$date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return $base+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!==''];}
+    $primary=primaryConference($db);$type=activeTicketType($db,(int)$primary['id']);
+    return array_replace($base,['event_id'=>(int)$primary['id'],'name'=>$primary['title'],'theme'=>$primary['description'],'start_date'=>substr((string)$primary['starts_at'],0,10),'end_date'=>substr((string)$primary['ends_at'],0,10),'venue'=>$primary['venue'],'currency'=>$primary['currency'],'price_kobo'=>(int)$type['price_kobo'],'payment_enabled'=>$c['secret']!=='']);
+}
 function order(\PDO $db,string $reference,string $token): array {
     $o=query($db,'SELECT * FROM natcon_orders WHERE reference=? AND access_token=?',[$reference,$token])->fetch();
     if (!$o) throw new \InvalidArgumentException('Registration not found.');
@@ -148,13 +176,13 @@ function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
         foreach(['course','institution','level','whatsapp','state_origin'] as $required) if(!clean($d[$required]??'')) throw new \InvalidArgumentException('Complete each delegate’s course, institution, level, WhatsApp number, and state of origin.');
         if(!preg_match('/^\d{1,2}$/',clean($d['times_attended']??'')) || (int)$d['times_attended']>99) throw new \InvalidArgumentException('Enter NATCON attendance from 0 to 99.');
     }
-    $ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$amount=event($c)['price_kobo']*count($delegates);
+    $canonical=event($c,$db);$eventId=(int)$canonical['event_id'];$type=activeTicketType($db,$eventId);$ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$amount=(int)$type['price_kobo']*count($delegates);
     $db->beginTransaction();try {
         // Serialize capacity reservation across workers, including SQLite test deployments.
         query($db,"UPDATE natcon_locks SET value=value+1 WHERE name='registration'");
-        $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid')")->fetchColumn();
-        if($c['capacity']>0 && $reserved+count($delegates)>$c['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
-        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id) VALUES(?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now(),$accountId]);
+        $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid') AND o.event_id=?",[$eventId])->fetchColumn();
+        if((int)$type['capacity']>0 && $reserved+count($delegates)>(int)$type['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
+        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id,event_id,ticket_type_id,subtotal_kobo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now(),$accountId,$eventId,$type['id'],$amount]);
         foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['chapter']??'',150),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
         audit($db,'public','registered',$ref,['delegates'=>count($delegates),'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}
