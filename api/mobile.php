@@ -113,7 +113,7 @@ try {
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
         $eventId=clean($in['event_id']??'',32);$primary=\Natcon\primaryConference($db);if(in_array($eventId,['NATCON-2026','2026'],true))$eventId=(string)$primary['id'];
         $event=\Natcon\publishedEvent($db,$eventId);$account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null,(string)$event['id']);
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>\Natcon\mobileReviews($db,(int)$event['id'])]);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>$detail['event_gallery']??[],'Event_Artist'=>$detail['event_artists']??[],'Event_Facility'=>$detail['event_facilities']??[],'Event_Restriction'=>$detail['event_restrictions']??[],'reviewdata'=>\Natcon\mobileReviews($db,(int)$event['id'])]);
     }
     if($client==='user_api'&&$endpoint==='u_event_type_price.php'){
         $eventId=clean($in['event_id']??'',32);$primary=\Natcon\primaryConference($db);if(in_array($eventId,['NATCON-2026','2026'],true))$eventId=(string)$primary['id'];
