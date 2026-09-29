@@ -36,6 +36,7 @@ import 'PaymentGateway/payfast.dart';
 import 'PaymentGateway/paystack.dart';
 import 'PaymentGateway/paytm_payment.dart';
 import 'home_screen.dart';
+import 'natcon_delegate_details.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
   const OrderDetailsScreen({super.key});
@@ -95,6 +96,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
   PayStackController payStackController = Get.put(PayStackController());
   String? accessToken;
   String? payerID;
+  bool isCheckoutLoading = false;
 
 
   @override
@@ -134,19 +136,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ),
         onclick: () {
           if (getData.read("UserLogin") != null) {
-            if (subtotal != 0.0) {
-              if (status == true) {
-                if (double.parse(total.toString()) > 0) {
-                  paymentSheett();
-                } else {
-                  bookEvent("0");
-                }
-              } else {
-                paymentSheett();
-              }
-            } else {
-              bookEvent("0");
-            }
+            if (!isCheckoutLoading) startNatconCheckout();
           } else {
             Get.to(LoginScreen());
           }
@@ -579,6 +569,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                         fontSize: 17,
                       ),
                     ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'NATCON confirms the final price on the server before payment. The amount shown above is an estimate.',
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
+                    ),
                     SizedBox(
                       height: 15,
                     ),
@@ -726,6 +721,86 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> startNatconCheckout() async {
+    final account = getData.read('UserLogin');
+    if (account is! Map<String, dynamic>) {
+      showToastMessage('Sign in to continue with NATCON checkout.');
+      return;
+    }
+    final selectedCount = int.tryParse(eventDetailsController.totalTicke) ??
+        eventDetailsController.totalTicket;
+    if (selectedCount < 1 || selectedCount > 50) {
+      showToastMessage('Choose between 1 and 50 delegates.');
+      return;
+    }
+    final delegates = await Get.to<List<Map<String, String>>>(
+      () => NatconDelegateDetailsScreen(count: selectedCount, account: account),
+    );
+    if (delegates == null || !mounted) return;
+
+    setState(() => isCheckoutLoading = true);
+    try {
+      final order = await bookEventController.createNatconOrder(
+        account: Map<String, dynamic>.from(account),
+        delegates: delegates,
+      );
+      final amountKobo = (order['amount_kobo'] as num?)?.toInt() ?? 0;
+      final confirm = await Get.dialog<bool>(AlertDialog(
+        title: const Text('Confirm NATCON total'),
+        content: Text(
+          '${currency} ${(amountKobo / 100).toStringAsFixed(2)} for ${delegates.length} delegate(s). This total is calculated by NATCON.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(result: false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Get.back(result: true), child: const Text('Continue to Paystack')),
+        ],
+      ));
+      if (confirm != true) return;
+
+      final payment = await bookEventController.initializeNatconPayment(
+        reference: order['reference'].toString(),
+        token: order['access_token'].toString(),
+      );
+      final authorizationUrl = payment['authorization_url']?.toString() ?? '';
+      if (authorizationUrl.isEmpty) {
+        throw const FormatException('NATCON did not return a Paystack checkout link.');
+      }
+      final reference = order['reference'].toString();
+      final orderToken = order['access_token'].toString();
+      await Get.to(() => PayStackWeb(
+        initialUrl: authorizationUrl,
+        navigationDelegate: (request) async {
+          final callback = Uri.tryParse(request.url);
+          final baseHost = Uri.parse(Config.imageUrl).host;
+          if (callback != null &&
+              callback.host == baseHost &&
+              callback.path.endsWith('/conference/')) {
+            try {
+              final verified = await bookEventController.verifyNatconPayment(
+                reference: reference,
+                token: orderToken,
+              );
+              if (verified['status'] == 'paid') {
+                Get.back();
+                await OrderPlacedSuccessfully();
+              } else {
+                showToastMessage('Payment is still being confirmed. Keep your NATCON reference and check your tickets again shortly.');
+              }
+            } catch (_) {
+              showToastMessage('NATCON could not confirm payment yet. Your registration is saved; check again shortly.');
+            }
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
+      ));
+    } catch (error) {
+      showToastMessage(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => isCheckoutLoading = false);
+    }
   }
 
   //! ------------- Wallet Clc ----------- !//

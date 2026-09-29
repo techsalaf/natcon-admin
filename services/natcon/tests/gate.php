@@ -1,13 +1,16 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/bootstrap.php';
-use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken,mobileTicketHistory,mobileTicketInfo};
+use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken,mobileTicketHistory,mobileTicketInfo,mobileEventCard,mobileEventDetails,mobileTicketType,event};
 $db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);migrate($db);$c=config();$checks=0;
 function delegateInput(string $name,string $email): array { return ['name'=>$name,'email'=>$email,'course'=>'Islamic Studies','institution'=>'Test University','level'=>'Graduate','whatsapp'=>'08000000000','calling_line'=>'','state_origin'=>'Osun','times_attended'=>'2']; }
 function check($yes,string $label): void {global $checks;if(!$yes)throw new RuntimeException($label);$checks++;}
 function rejects(callable $fn,string $label):void {try{$fn();}catch(InvalidArgumentException $e){check(true,$label);return;}throw new RuntimeException($label);}
 $tables=array_column($db->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(),'name');
 foreach(['natcon_accounts','natcon_mobile_tokens','natcon_categories','natcon_events','natcon_ticket_types','natcon_wallet_ledger','natcon_coupons','natcon_coupon_redemptions','natcon_favorites','natcon_reviews','natcon_referrals','natcon_payouts','natcon_event_media','natcon_artists','natcon_event_facilities','natcon_event_restrictions','natcon_faqs','natcon_pages','natcon_notifications','natcon_devices','natcon_chat_threads','natcon_chat_messages','natcon_otp_challenges'] as $table)check(in_array($table,$tables,true),'Mobile feature schema exists: '.$table);
+$eventCard=mobileEventCard($c);check($eventCard['event_id']==='NATCON-2026'&&$eventCard['event_title']===$c['name'],'Mobile event discovery uses the canonical NATCON conference');
+$eventDetails=mobileEventDetails($db,$c);check(isset($eventDetails['event_about'],$eventDetails['event_address'],$eventDetails['ticket_price'],$eventDetails['event_tags']),'Mobile event details satisfy the existing app model');
+$mobileType=mobileTicketType($c);check((float)$mobileType['ticket_price']==(event($c)['price_kobo']/100)&&$mobileType['typeid']==='NATCON-GENERAL','Mobile ticket price is sourced from canonical server pricing');
 // Attendee accounts use password hashes and revocable bearer tokens for mobile clients.
 $account=createAccount($db,['name'=>'Account Test','email'=>'account@example.test','country_code'=>'+234','phone'=>'08001112222','password'=>'test-password-123']);
 check(strlen($account['access_token'])===64,'Account registration issues a mobile token');
