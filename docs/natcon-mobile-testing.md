@@ -39,6 +39,9 @@ From the repository root, run:
 php services/natcon/tests/gate.php
 php services/natcon/evals/run.php
 php services/natcon/evals/mobile-schema.php
+php services/natcon/tests/legacy-accounts.php
+php services/natcon/evals/legacy-accounts.php
+node services/natcon/tests/legacy-account-cli.cjs
 node conference/tests/gate.cjs
 node conference/tests/multi-event-http.e2e.cjs
 node conference/evals/flows.cjs

@@ -1,7 +1,8 @@
 <?php
 declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
-use function Natcon\{config,database,migrate,query,now,audit};
+require_once __DIR__.'/legacy-accounts.php';
+use function Natcon\{config,database,migrate,query,now,audit,importLegacyAccounts,rollbackLegacyAccountImport};
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 $c=config();$db=database($c);$command=$argv[1]??'help';
 try{
@@ -19,5 +20,8 @@ elseif($command==='staff'){
         $ok=mail($row['recipient'],$row['subject'],$row['body'],['From'=>$from,'Content-Type'=>'text/plain; charset=UTF-8']);
         query($db,'UPDATE natcon_outbox SET status=?,sent_at=? WHERE id=?',[$ok?'sent':'pending',$ok?now():null,$row['id']]);$ok?$sent++:$failed++;
     }audit($db,'cli','mail_dispatch','',['sent'=>$sent,'failed'=>$failed]);echo json_encode(['sent'=>$sent,'failed'=>$failed])."\n";
-}else echo "Commands: migrate | staff email role name (NATCON_STAFF_PASSWORD env or stdin) | mail\n";
+}elseif($command==='legacy-accounts'){
+    if(($argv[2]??'')==='--rollback'){$batch=(string)($argv[3]??'');echo json_encode(rollbackLegacyAccountImport($db,$batch),JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n";}
+    else{$apply=($argv[2]??'')==='--apply';$batch=(string)($argv[3]??'');if($apply&&$batch==='')$batch='legacy-accounts-'.gmdate('YmdHis').'-'.bin2hex(random_bytes(4));if(!$apply&&$batch==='')$batch='legacy-accounts-dry-run-'.bin2hex(random_bytes(4));$report=importLegacyAccounts($db,$batch,$apply);echo json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n";}
+}else echo "Commands: migrate | staff email role name (NATCON_STAFF_PASSWORD env or stdin) | mail | legacy-accounts [--apply [batch-id] | --rollback batch-id]\n";
 }catch(Throwable $e){fwrite(STDERR,$e->getMessage()."\n");exit(1);}

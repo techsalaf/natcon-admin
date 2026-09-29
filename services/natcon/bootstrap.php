@@ -56,7 +56,8 @@ function migrate(\PDO $db): void {
         "natcon_devices (id $id, account_id BIGINT NOT NULL, provider VARCHAR(20) NOT NULL, device_token VARCHAR(512) NOT NULL UNIQUE, updated_at VARCHAR(30) NOT NULL)",
         "natcon_chat_threads (id $id, account_id BIGINT NOT NULL, event_id BIGINT, status VARCHAR(20) NOT NULL DEFAULT 'open', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
         "natcon_chat_messages (id $id, thread_id BIGINT NOT NULL, sender_type VARCHAR(20) NOT NULL, sender_id BIGINT NOT NULL, message TEXT NOT NULL, created_at VARCHAR(30) NOT NULL)",
-        "natcon_otp_challenges (id $id, destination VARCHAR(190) NOT NULL, channel VARCHAR(20) NOT NULL, code_hash VARCHAR(255) NOT NULL, expires_at VARCHAR(30) NOT NULL, consumed_at VARCHAR(30), attempts INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL)"
+        "natcon_otp_challenges (id $id, destination VARCHAR(190) NOT NULL, channel VARCHAR(20) NOT NULL, code_hash VARCHAR(255) NOT NULL, expires_at VARCHAR(30) NOT NULL, consumed_at VARCHAR(30), attempts INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL)",
+        "natcon_legacy_account_imports (id $id, batch_id VARCHAR(80) NOT NULL, source_table VARCHAR(80) NOT NULL, source_id VARCHAR(80) NOT NULL, target_id BIGINT NOT NULL, target_fingerprint CHAR(64) NOT NULL, wallet_kobo INTEGER NOT NULL DEFAULT 0, created_at VARCHAR(30) NOT NULL, UNIQUE(source_table,source_id), UNIQUE(batch_id,target_id))"
     ] as $schema) $db->exec('CREATE TABLE IF NOT EXISTS '.$schema);
     $driver=$db->getAttribute(\PDO::ATTR_DRIVER_NAME);
     $profileColumns=$driver==='sqlite'?array_column($db->query('PRAGMA table_info(natcon_event_profiles)')->fetchAll(),'name'):array_column(query($db,"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='natcon_event_profiles'")->fetchAll(),'COLUMN_NAME');
