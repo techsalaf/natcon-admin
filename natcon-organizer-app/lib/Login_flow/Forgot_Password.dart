@@ -9,11 +9,11 @@ import 'package:magicmate_organizer/utils/Colors.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/dark_light_mode.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class ForgotPassword extends StatefulWidget {
   String? mobileNo;
@@ -201,7 +201,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
         "password": Newpassword.text,
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.forgotpassword);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

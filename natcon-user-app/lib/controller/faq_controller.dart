@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get_state_manager/get_state_manager.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/faq_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class FaqController extends GetxController implements GetxService {
   FaqListInfo? faqListInfo;
@@ -19,7 +19,7 @@ class FaqController extends GetxController implements GetxService {
         "uid": getData.read("UserLogin")["id"].toString(),
       };
       Uri uri = Uri.parse(Config.baseurl + Config.faqApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

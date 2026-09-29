@@ -39,7 +39,7 @@ class _RegistrarScreenState extends State<RegistrarScreen> {
     if (busy) return;
     setState(() { busy = true; error = null; });
     try {
-      final data = await widget.api.call('login', {'email': email.text.trim(), 'password': password.text});
+      final data = await widget.api.call('mobile_login', {'email': email.text.trim(), 'password': password.text});
       password.clear();
       if (mounted) setState(() => user = Map<String, dynamic>.from(data['user']));
     } catch (e) { if (mounted) setState(() => error = e.toString()); }
@@ -61,7 +61,7 @@ class _RegistrarScreenState extends State<RegistrarScreen> {
     await camera?.stop();
     try { await widget.api.call('logout', {}); }
     catch (e) { if (mounted) setState(() => error = e.toString()); return; }
-    widget.api.cookie = ''; widget.api.csrf = '';
+    widget.api.cookie = ''; widget.api.csrf = ''; widget.api.accessToken = '';
     if (mounted) setState(() { user = null; result = null; scanning = false; code.clear(); });
   }
   void startScan() {

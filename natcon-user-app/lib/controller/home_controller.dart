@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
@@ -17,6 +16,7 @@ import '../model/map_info.dart';
 import '../screen/LoginAndSignup/onbording_screen.dart.dart';
 import '../screen/home_screen.dart';
 import 'eventdetails_controller.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class HomePageController extends GetxController implements GetxService {
   EventDetailsController eventDetailsController = Get.find();
@@ -56,7 +56,7 @@ class HomePageController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.homeDataApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

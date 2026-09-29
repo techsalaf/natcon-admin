@@ -8,8 +8,8 @@ import 'package:magicmate_organizer/api_screens/Api_werper.dart';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class PageListController extends GetxController implements GetxService {
   DynamicPageData? dynamicPageData;
@@ -22,7 +22,7 @@ class PageListController extends GetxController implements GetxService {
   getPageListData() async {
     try {
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.pagelist);
-      var response = await http.post(uri);
+      var response = await NatconHttp.post(uri);
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         print(result.toString());
@@ -43,7 +43,7 @@ class PageListController extends GetxController implements GetxService {
       };
       print(".:.:.:.:.:.:.:.:.:..." + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.profileUpdate);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -65,7 +65,7 @@ class PageListController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.deletAccount);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -97,7 +97,7 @@ class PageListController extends GetxController implements GetxService {
         "name": name,
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.editProfile);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

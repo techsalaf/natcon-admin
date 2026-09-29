@@ -11,8 +11,8 @@ import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:textfield_tags/textfield_tags.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class AddlistofeventController extends GetxController implements GetxService {
   ListofeventController listofeventController = Get.find();
@@ -175,7 +175,7 @@ class AddlistofeventController extends GetxController implements GetxService {
       };
       // print("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&$data");
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.eventedit);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(data),
       );
@@ -290,7 +290,7 @@ class AddlistofeventController extends GetxController implements GetxService {
       };
       print("............." + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.eventadd);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

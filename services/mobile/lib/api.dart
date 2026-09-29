@@ -10,6 +10,7 @@ class NatconApi {
   final http.Client client;
   String csrf = '';
   String cookie = '';
+  String accessToken = '';
 
   static bool isValidBase(String value) {
     final uri = Uri.tryParse(value);
@@ -23,6 +24,9 @@ class NatconApi {
     final headers = <String, String>{'Accept': 'application/json'};
     if (cookie.isNotEmpty) headers['Cookie'] = cookie;
     if (csrf.isNotEmpty) headers['X-CSRF-Token'] = csrf;
+    if (accessToken.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    }
     if (body != null) headers['Content-Type'] = 'application/json';
     final response = await (body == null
             ? client.get(url, headers: headers)
@@ -44,6 +48,8 @@ class NatconApi {
     final data = Map<String, dynamic>.from(decoded['data'] as Map? ?? {});
     if (data['csrf_token'] is String) csrf = data['csrf_token'] as String;
     if (data['csrf'] is String) csrf = data['csrf'] as String;
+    final user = data['user'];
+    if (user is Map && user['access_token'] is String) accessToken = user['access_token'] as String;
     return data;
   }
 

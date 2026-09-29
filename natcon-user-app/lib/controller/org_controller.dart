@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../model/org_info.dart';
 import '../model/user_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class OrgController extends GetxController implements GetxService {
   OrgInfo? orgInfo;
@@ -25,7 +25,7 @@ class OrgController extends GetxController implements GetxService {
       Uri uri = Uri.parse(Config.baseurl + Config.eventStatusWise);
       print(uri);
       print(map);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -50,7 +50,7 @@ class OrgController extends GetxController implements GetxService {
       };
       print("-----======-----" + map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.joinUserList);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

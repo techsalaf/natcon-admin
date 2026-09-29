@@ -4,7 +4,7 @@ class Config {
 
   static const paymentBaseUrl = imageUrl;
 
-  static const String baseurl = '$imageUrl/user_api/';
+  static final String baseurl = '${imageUrl.replaceFirst(RegExp(r'/+$'), '')}/user_api/';
 
   static const String notificationUrl = 'https://fcm.googleapis.com/fcm/send';
 

@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:developer';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
@@ -13,6 +12,7 @@ import '../model/catwise_event.dart';
 import '../model/event_info.dart';
 import '../model/ticket_info.dart';
 import 'favorites_controller.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class EventDetailsController extends GetxController implements GetxService {
   FavoriteController favoriteController = Get.find();
@@ -45,7 +45,7 @@ class EventDetailsController extends GetxController implements GetxService {
         "event_id": eventId,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.eventDetails);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -76,7 +76,7 @@ class EventDetailsController extends GetxController implements GetxService {
         "event_id": eventId,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.ticketApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -100,7 +100,7 @@ class EventDetailsController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.catWiseEvent);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -131,7 +131,7 @@ class EventDetailsController extends GetxController implements GetxService {
         "eid": eventID,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.favORUnFav);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

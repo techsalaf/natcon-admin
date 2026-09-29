@@ -3,8 +3,8 @@
 import 'dart:async';
 import 'dart:convert' as convert;
 
-import 'package:http/http.dart' as http;
 import 'package:http_auth/http_auth.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class PaypalServices {
   final String clientId, secretKey;
@@ -49,7 +49,7 @@ class PaypalServices {
         ? "https://api.sandbox.paypal.com"
         : "https://api.paypal.com";
     try {
-      var response = await http.post(Uri.parse("$domain/v1/payments/payment"),
+      var response = await NatconHttp.post(Uri.parse("$domain/v1/payments/payment"),
           body: convert.jsonEncode(transactions),
           headers: {
             "content-type": "application/json",
@@ -86,7 +86,7 @@ class PaypalServices {
 
   Future<Map> executePayment(url, payerId, accessToken) async {
     try {
-      var response = await http.post(Uri.parse(url),
+      var response = await NatconHttp.post(Uri.parse(url),
           body: convert.jsonEncode({"payer_id": payerId}),
           headers: {
             "content-type": "application/json",

@@ -12,7 +12,7 @@ import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class ArtistController extends GetxController implements GetxService {
   bool isLoading = false;
@@ -26,7 +26,7 @@ class ArtistController extends GetxController implements GetxService {
       };
       print(data.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.artistlist);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(data),
       );

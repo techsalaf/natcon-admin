@@ -4,14 +4,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
-import '../firebase/auth_firebase.dart';
 import '../screen/choosefevorite_event.dart';
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class SignUpController extends GetxController implements GetxService {
   TextEditingController name = TextEditingController();
@@ -59,7 +58,7 @@ class SignUpController extends GetxController implements GetxService {
         "ccode": cuntryCode,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.mobileChack);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -94,7 +93,7 @@ class SignUpController extends GetxController implements GetxService {
         "ccode": cuntryCode,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.mobileChack);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -125,7 +124,6 @@ class SignUpController extends GetxController implements GetxService {
     }
   }
 
-  FirebaseAuthService firebaseAuthService = Get.put(FirebaseAuthService());
 
   setUserApiData(String cuntryCode) async {
     try {
@@ -137,7 +135,7 @@ class SignUpController extends GetxController implements GetxService {
         "password": password.text
       };
       Uri uri = Uri.parse(Config.baseurl + Config.registerUser);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -148,9 +146,9 @@ class SignUpController extends GetxController implements GetxService {
         signUpMsg = result["ResponseMsg"];
         showToastMessage(signUpMsg);
         save("UserLogin", result["UserLogin"]);
+        save('NATCON_ACCESS_TOKEN', result['AccessToken']);
         // OneSignal.shared.sendTag("user_id", getData.read("UserLogin")["id"]);
         OneSignal.User.addTagWithKey("user_id", getData.read("UserLogin")["id"]);
-        firebaseAuthService.singUpAndStore(uid: result["UserLogin"]["id"], name: result["UserLogin"]["name"], email: result["UserLogin"]["email"], number: result["UserLogin"]["mobile"], proPicPath: result["UserLogin"]["pro_pic"] ?? "");
         Get.offAll(const ChooseFevoriteEvent());
         update();
       }
@@ -168,7 +166,7 @@ class SignUpController extends GetxController implements GetxService {
         "email": email,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.editProfileApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

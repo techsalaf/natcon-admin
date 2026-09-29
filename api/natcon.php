@@ -1,21 +1,28 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit};
+use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile};
 header('X-Content-Type-Options: nosniff');header('Cache-Control: no-store');header('Content-Type: application/json; charset=utf-8');
 ini_set('session.use_strict_mode', '1');
 session_name('natcon_staff');session_set_cookie_params(['httponly'=>true,'secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','samesite'=>'Strict','path'=>'/']);session_start();
 function respond($data): never {echo json_encode(['ok'=>true,'data'=>$data],JSON_UNESCAPED_SLASHES);exit;}
-function requireStaff(array $roles): array {if(empty($_SESSION['user'])||($_SESSION['last_active']??0)<time()-3600){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if(!in_array($_SESSION['user']['role'],$roles,true)){http_response_code(403);throw new InvalidArgumentException('Your role cannot perform this action.');}$_SESSION['last_active']=time();return $_SESSION['user'];}
+function requireStaff(array $roles): array {global $db;$user=$_SESSION['user']??null;if(!$user)$user=staffForToken($db);if(!$user||(!isset($user['token_id'])&&($_SESSION['last_active']??0)<time()-3600)){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if(!in_array($user['role'],$roles,true)){http_response_code(403);throw new InvalidArgumentException('Your role cannot perform this action.');}if(!isset($user['token_id']))$_SESSION['last_active']=time();return $user;}
 try {
     $c=config();$action=clean($_GET['action']??'event',50);$method=$_SERVER['REQUEST_METHOD'];
     if($action==='event'&&$method==='GET')respond(event($c));
     $db=database($c);$raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','ticket','qr','dashboard','delegates','transfers','export','audit'];
-    if($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
-    if(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
-    if($action==='register'){limit($db,'register:'.($_SERVER['REMOTE_ADDR']??''),20);respond(register($db,$c,$in));}
+    $getActions=['session','order','payment_verify','ticket','qr','dashboard','delegates','transfers','export','audit','account_session','account_profile','account_orders'];
+    if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
+    elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
+    elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
+    if($action==='account_register'){limit($db,'account-register:'.($_SERVER['REMOTE_ADDR']??''),10);respond(createAccount($db,$in));}
+    if($action==='account_login'){limit($db,'account-login:'.($_SERVER['REMOTE_ADDR']??''),10);respond(loginAccount($db,$in));}
+    if($action==='account_session'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}unset($account['token_id']);respond($account);}
+    if($action==='account_profile'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}if($method==='GET'){unset($account['token_id']);respond($account);}respond(updateAccountProfile($db,(int)$account['id'],$in));}
+    if($action==='account_orders'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}respond(query($db,'SELECT reference,amount_kobo,currency,status,created_at,paid_at FROM natcon_orders WHERE account_id=? ORDER BY created_at DESC',[$account['id']])->fetchAll());}
+    if($action==='account_logout'){$account=accountForToken($db);if(!$account){http_response_code(401);throw new InvalidArgumentException('Please sign in.');}query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE id=?',[now(),$account['token_id']]);respond(['logged_out'=>true]);}
+    if($action==='register'){limit($db,'register:'.($_SERVER['REMOTE_ADDR']??''),20);$account=accountForToken($db);respond(register($db,$c,$in,$account?(int)$account['id']:null));}
     if($action==='order')respond(order($db,clean($_GET['reference']??''),clean($_GET['token']??'')));
     if($action==='payment_initialize'){
         $o=order($db,clean($in['reference']??''),clean($in['token']??''));if(!in_array($o['status'],['pending','awaiting_review'],true))throw new InvalidArgumentException('This registration cannot accept a payment.');
@@ -39,15 +46,20 @@ try {
     }
     if($action==='ticket')respond(delegate($db,clean($_GET['token']??''))+['event'=>event($c)]);
     if($action==='qr'){$d=delegate($db,clean($_GET['token']??''));require_once dirname(__DIR__).'/qr/phpqrcode.php';header('Content-Type: image/png');\QRcode::png($d['ticket_token'],false,QR_ECLEVEL_M,7,2);exit;}
+    if($action==='mobile_login'){
+        limit($db,'mobile-login:'.($_SERVER['REMOTE_ADDR']??''),10);$u=query($db,'SELECT * FROM natcon_staff WHERE email=?',[strtolower(clean($in['email']??''))])->fetch();
+        if(!$u||!password_verify((string)($in['password']??''),$u['password_hash'])){http_response_code(401);throw new InvalidArgumentException('Email or password is incorrect.');}
+        unset($u['password_hash']);$u['access_token']=issueMobileToken($db,'staff',(int)$u['id'],$u['role']);audit($db,(string)$u['id'],'mobile_login');respond(['user'=>$u]);
+    }
     if($action==='login'){
         limit($db,'login:'.($_SERVER['REMOTE_ADDR']??''),10);$u=query($db,'SELECT * FROM natcon_staff WHERE email=?',[strtolower(clean($in['email']??''))])->fetch();
         if(!$u||!password_verify((string)($in['password']??''),$u['password_hash'])){http_response_code(401);throw new InvalidArgumentException('Email or password is incorrect.');}
         unset($u['password_hash']);session_regenerate_id(true);$_SESSION['user']=$u;$_SESSION['csrf']=bin2hex(random_bytes(32));$_SESSION['last_active']=time();audit($db,(string)$u['id'],'login');respond(['user'=>$u,'csrf'=>$_SESSION['csrf']]);
     }
     $user=requireStaff(['admin','finance','registrar']);
-    if($action==='session')respond(['user'=>$user,'csrf'=>$_SESSION['csrf']]);
-    if($method==='POST'&&!hash_equals($_SESSION['csrf']??'',$_SERVER['HTTP_X_CSRF_TOKEN']??'')){http_response_code(403);throw new InvalidArgumentException('Session verification failed. Refresh and try again.');}
-    if($action==='logout'){$_SESSION=[];session_destroy();respond(['logged_out'=>true]);}
+    if($action==='session'){unset($user['token_id']);respond(['user'=>$user,'csrf'=>$_SESSION['csrf']??null]);}
+    if($method==='POST'&&!isset($user['token_id'])&&!hash_equals($_SESSION['csrf']??'',$_SERVER['HTTP_X_CSRF_TOKEN']??'')){http_response_code(403);throw new InvalidArgumentException('Session verification failed. Refresh and try again.');}
+    if($action==='logout'){if(isset($user['token_id']))query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE id=?',[now(),$user['token_id']]);$_SESSION=[];session_destroy();respond(['logged_out'=>true]);}
     if($action==='dashboard'){
         respond(['total_delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),'paid_delegates'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON d.reference=o.reference WHERE o.status='paid'")->fetchColumn(),'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),'revenue_kobo'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),'chapters'=>query($db,'SELECT chapter,COUNT(*) AS total FROM natcon_delegates GROUP BY chapter ORDER BY total DESC')->fetchAll()]);
     }

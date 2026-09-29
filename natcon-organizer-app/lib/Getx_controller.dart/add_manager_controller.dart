@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import '../Model class/add_manager_model.dart';
 import '../Model class/edit_manager_model.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 
 class AddManagerController extends GetxController implements GetxService {
@@ -45,7 +45,7 @@ class AddManagerController extends GetxController implements GetxService {
       "Content-type": "application/json",
       "Accept": "application/json"
     };
-    var response = await http.post(Uri.parse(AppUrl.baseUrl + AppUrl.addManger), body: jsonEncode(body), headers: userHeader);
+    var response = await NatconHttp.post(Uri.parse(AppUrl.baseUrl + AppUrl.addManger), body: jsonEncode(body), headers: userHeader);
 
     print("svcsvsv:--------- ${body}");
     print("++++:--------- ${response.body}");
@@ -125,7 +125,7 @@ class AddManagerController extends GetxController implements GetxService {
       "Content-type": "application/json",
       "Accept": "application/json"
     };
-    var response = await http.post(Uri.parse(AppUrl.baseUrl + AppUrl.editMangerList), body: jsonEncode(body), headers: userHeader);
+    var response = await NatconHttp.post(Uri.parse(AppUrl.baseUrl + AppUrl.editMangerList), body: jsonEncode(body), headers: userHeader);
 
     print("svcsvsv:--------- ${body}");
     print("++++:--------- ${response.body}");

@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class BookEventController extends GetxController implements GetxService {
   double couponAmt = 0.0;
@@ -51,7 +51,7 @@ class BookEventController extends GetxController implements GetxService {
       };
       print("::::::::::---------::::::::::" + map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.bookEventApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

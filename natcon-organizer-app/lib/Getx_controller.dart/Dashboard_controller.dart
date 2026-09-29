@@ -9,9 +9,9 @@ import 'package:magicmate_organizer/api_screens/Api_werper.dart';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class DashboardController extends GetxController {
   bool isLoading = false;
@@ -57,7 +57,7 @@ class DashboardController extends GetxController {
         "orag_id": getData.read("UserLogin")["id"],
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.facilitylist);
-      var response = await http.post(uri, body: jsonEncode(data));
+      var response = await NatconHttp.post(uri, body: jsonEncode(data));
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         print("Result-------" + result.toString());
@@ -77,7 +77,7 @@ class DashboardController extends GetxController {
         "orag_id": getData.read("UserLogin")["id"],
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.restrictionlist);
-      var response = await http.post(uri, body: jsonEncode(data));
+      var response = await NatconHttp.post(uri, body: jsonEncode(data));
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         print("Result-------" + result.toString());

@@ -30,7 +30,8 @@ function migrate(\PDO $db): void {
         "natcon_limits (bucket VARCHAR(100) PRIMARY KEY, count INTEGER NOT NULL, window_start INTEGER NOT NULL)",
         "natcon_transfer_receipts (bank_reference VARCHAR(190) PRIMARY KEY, reference VARCHAR(64) NOT NULL UNIQUE, amount_kobo INTEGER NOT NULL, staff_id BIGINT NOT NULL, verified_at VARCHAR(30) NOT NULL)",
         "natcon_locks (name VARCHAR(50) PRIMARY KEY, value INTEGER NOT NULL)",
-        "natcon_accounts (id $id, name VARCHAR(150) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE, country_code VARCHAR(12) NOT NULL DEFAULT '', phone VARCHAR(40) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, profile_image TEXT, referral_code VARCHAR(32) NOT NULL UNIQUE, referred_by BIGINT, wallet_balance_kobo INTEGER NOT NULL DEFAULT 0, status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
+        "natcon_accounts (id $id, name VARCHAR(150) NOT NULL, email VARCHAR(190) NOT NULL UNIQUE, country_code VARCHAR(12) NOT NULL DEFAULT '', phone VARCHAR(40) NOT NULL, password_hash VARCHAR(255) NOT NULL, profile_image TEXT, referral_code VARCHAR(32) NOT NULL UNIQUE, referred_by BIGINT, wallet_balance_kobo INTEGER NOT NULL DEFAULT 0, status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30), UNIQUE(country_code,phone))",
+        "natcon_mobile_tokens (id $id, token_hash CHAR(64) NOT NULL UNIQUE, principal_type VARCHAR(20) NOT NULL, principal_id BIGINT NOT NULL, role VARCHAR(30), expires_at VARCHAR(30) NOT NULL, revoked_at VARCHAR(30), created_at VARCHAR(30) NOT NULL)",
         "natcon_categories (id $id, title VARCHAR(150) NOT NULL, image_url TEXT, status VARCHAR(20) NOT NULL DEFAULT 'active', sort_order INTEGER NOT NULL DEFAULT 0)",
         "natcon_events (id $id, owner_staff_id BIGINT, category_id BIGINT, title VARCHAR(190) NOT NULL, slug VARCHAR(190) NOT NULL UNIQUE, description TEXT, venue VARCHAR(255), latitude VARCHAR(40), longitude VARCHAR(40), starts_at VARCHAR(30), ends_at VARCHAR(30), currency VARCHAR(3) NOT NULL DEFAULT 'NGN', status VARCHAR(20) NOT NULL DEFAULT 'draft', created_at VARCHAR(30) NOT NULL, updated_at VARCHAR(30))",
         "natcon_ticket_types (id $id, event_id BIGINT NOT NULL, label VARCHAR(120) NOT NULL, description TEXT, price_kobo INTEGER NOT NULL, capacity INTEGER NOT NULL DEFAULT 0, sales_start VARCHAR(30), sales_end VARCHAR(30), status VARCHAR(20) NOT NULL DEFAULT 'active', created_at VARCHAR(30) NOT NULL, UNIQUE(event_id,label))",
@@ -75,6 +76,38 @@ function migrate(\PDO $db): void {
 }
 function now(): string { return gmdate('Y-m-d H:i:s'); }
 function query(\PDO $db,string $sql,array $args=[]): \PDOStatement { $q=$db->prepare($sql);$q->execute($args);return $q; }
+function issueMobileToken(\PDO $db,string $type,int $id,?string $role=null): string {
+    $token=bin2hex(random_bytes(32));query($db,'INSERT INTO natcon_mobile_tokens(token_hash,principal_type,principal_id,role,expires_at,created_at) VALUES(?,?,?,?,?,?)',[hash('sha256',$token),$type,$id,$role,gmdate('Y-m-d H:i:s',time()+60*60*24*30),now()]);return $token;
+}
+function accountForToken(\PDO $db): ?array {
+    $headers=function_exists('getallheaders')?getallheaders():[];$auth=$_SERVER['HTTP_AUTHORIZATION']??($headers['Authorization']??'');
+    if(!preg_match('/^Bearer ([a-f0-9]{64})$/i',$auth,$m))return null;
+    $row=query($db,"SELECT a.id,a.name,a.email,a.country_code,a.phone,a.profile_image,a.referral_code,a.wallet_balance_kobo,t.id AS token_id FROM natcon_mobile_tokens t JOIN natcon_accounts a ON a.id=t.principal_id WHERE t.token_hash=? AND t.principal_type='attendee' AND t.revoked_at IS NULL AND t.expires_at>? AND a.status='active'",[hash('sha256',strtolower($m[1])),now()])->fetch();return $row?:null;
+}
+function staffForToken(\PDO $db): ?array {
+    $headers=function_exists('getallheaders')?getallheaders():[];$auth=$_SERVER['HTTP_AUTHORIZATION']??($headers['Authorization']??'');
+    if(!preg_match('/^Bearer ([a-f0-9]{64})$/i',$auth,$m))return null;
+    $row=query($db,"SELECT s.id,s.name,s.email,s.role,t.id AS token_id FROM natcon_mobile_tokens t JOIN natcon_staff s ON s.id=t.principal_id WHERE t.token_hash=? AND t.principal_type='staff' AND t.revoked_at IS NULL AND t.expires_at>?",[hash('sha256',strtolower($m[1])),now()])->fetch();return $row?:null;
+}
+function createAccount(\PDO $db,array $in): array {
+    $name=clean($in['name']??'',150);$email=strtolower(clean($in['email']??'',190));$country=clean($in['country_code']??$in['ccode']??'',12);$phone=clean($in['phone']??$in['mobile']??'',40);$password=(string)($in['password']??'');
+    if(!$name||!filter_var($email,FILTER_VALIDATE_EMAIL)||!$phone||!preg_match('/^[+0-9 -]{6,40}$/',$phone)||strlen($password)<8||strlen($password)>128)throw new \InvalidArgumentException('Provide your name, a valid email, phone number, and password of at least 8 characters.');
+    $referral=strtoupper(bin2hex(random_bytes(6)));
+    try{query($db,'INSERT INTO natcon_accounts(name,email,country_code,phone,password_hash,referral_code,status,created_at) VALUES(?,?,?,?,?,?,?,?)',[$name,$email,$country,$phone,password_hash($password,PASSWORD_DEFAULT),$referral,'active',now()]);}
+    catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('An account already uses that email or phone number.');throw $e;}
+    $id=(int)$db->lastInsertId();$account=query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();$account['access_token']=issueMobileToken($db,'attendee',$id);return $account;
+}
+function loginAccount(\PDO $db,array $in): array {
+    $country=clean($in['country_code']??$in['ccode']??'',12);$phone=clean($in['phone']??$in['mobile']??'',40);$password=(string)($in['password']??'');
+    $account=query($db,"SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo,password_hash FROM natcon_accounts WHERE country_code=? AND phone=? AND status='active'",[$country,$phone])->fetch();
+    if(!$account||!password_verify($password,$account['password_hash']))throw new \InvalidArgumentException('Phone number or password is incorrect.');
+    unset($account['password_hash']);$account['access_token']=issueMobileToken($db,'attendee',(int)$account['id']);return $account;
+}
+function updateAccountProfile(\PDO $db,int $id,array $in): array {
+    $name=clean($in['name']??'',150);$email=strtolower(clean($in['email']??'',190));if(!$name||!filter_var($email,FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Provide a name and valid email address.');
+    try{query($db,'UPDATE natcon_accounts SET name=?,email=?,updated_at=? WHERE id=?',[$name,$email,now(),$id]);}catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('That email is already used by another account.');throw $e;}
+    return query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();
+}
 function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
 function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
 function event(array $c): array { $date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']))+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!=='']; }
@@ -85,7 +118,7 @@ function order(\PDO $db,string $reference,string $token): array {
     if($o['status']!=='paid') foreach($o['delegates'] as &$d) unset($d['ticket_token']);
     return $o;
 }
-function register(\PDO $db,array $c,array $in): array {
+function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
     if(($in['consent']??false)!==true)throw new \InvalidArgumentException('Accept the privacy notice before registering.');
     if((new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d H:i:s')>$c['registration_closes'])throw new \InvalidArgumentException('Registration has closed. Contact the organizers.');
     $name=clean($in['payer_name']??'',150);$email=strtolower(clean($in['payer_email']??''));$phone=clean($in['payer_phone']??'',40);$delegates=$in['delegates']??[];
@@ -101,7 +134,7 @@ function register(\PDO $db,array $c,array $in): array {
         query($db,"UPDATE natcon_locks SET value=value+1 WHERE name='registration'");
         $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid')")->fetchColumn();
         if($c['capacity']>0 && $reserved+count($delegates)>$c['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
-        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now()]);
+        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id) VALUES(?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now(),$accountId]);
         foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['chapter']??'',150),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
         audit($db,'public','registered',$ref,['delegates'=>count($delegates),'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}

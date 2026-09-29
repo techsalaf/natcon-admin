@@ -15,6 +15,7 @@ import '../../controller/signup_controller.dart';
 import '../../model/fontfamily_model.dart';
 import '../../utils/Colors.dart';
 import '../../utils/Custom_widget.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class ViewProfileScreen extends StatefulWidget {
   const ViewProfileScreen({super.key});
@@ -59,7 +60,7 @@ class _ViewProfileScreenState extends State<ViewProfileScreen> {
   networkimageconvert() {
     (() async {
       http.Response response =
-          await http.get(Uri.parse(Config.imageUrl + networkimage.toString()));
+          await NatconHttp.get(Uri.parse(Config.imageUrl + networkimage.toString()));
       if (mounted) {
         print(response.bodyBytes);
         setState(() {

@@ -2,10 +2,10 @@ import 'dart:convert';
 
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../model/msg_otp_model.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class MsgOtpController extends GetxController implements GetxService {
 
@@ -16,7 +16,7 @@ class MsgOtpController extends GetxController implements GetxService {
       "mobile": mobile
     };
     Map<String, String> userHeader = {"Content-type": "application/json", "Accept": "application/json"};
-    var response = await http.post(Uri.parse(Config.baseurl + Config.msgOtp),body: jsonEncode(body),headers: userHeader);
+    var response = await NatconHttp.post(Uri.parse(Config.baseurl + Config.msgOtp),body: jsonEncode(body),headers: userHeader);
 
     print("+++++++ ${response.body}");
     print("----- ${body}");

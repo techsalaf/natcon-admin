@@ -7,7 +7,7 @@ import 'package:magicmate_organizer/api_screens/Api_werper.dart';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class GalleryController extends GetxController implements GetxService {
   GalleryInfo? galleryInfo;
@@ -31,7 +31,7 @@ class GalleryController extends GetxController implements GetxService {
         "orag_id": getData.read("UserLogin")["id"],
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.galleryList);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -69,7 +69,7 @@ class GalleryController extends GetxController implements GetxService {
       };
       print(".-.-.-.-.-..-.-.-.-..-.-.-." + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.updategallery);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -116,7 +116,7 @@ class GalleryController extends GetxController implements GetxService {
       };
       print(".-.-.-.-.-..-.-.-.-..-.-.-." + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.addGallery);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../Bottombar_screen.dart';
@@ -11,6 +10,7 @@ import '../api_screens/confrigation.dart';
 import '../api_screens/data_store.dart';
 import '../firebase/auth_firebase.dart';
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class SignUpController extends GetxController implements GetxService {
 
@@ -29,7 +29,7 @@ class SignUpController extends GetxController implements GetxService {
       print("perametter${map.toString()}");
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.userregister);
       print("url====-----$uri");
-      var response = await http.post(uri, body: jsonEncode(map));
+      var response = await NatconHttp.post(uri, body: jsonEncode(map));
       print("************response*********${response.body.toString()}");
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);

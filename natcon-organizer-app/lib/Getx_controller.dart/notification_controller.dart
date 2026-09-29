@@ -6,7 +6,7 @@ import 'package:magicmate_organizer/Model%20class/notification_info.dart';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class NotificationController extends GetxController implements GetxService {
   NotificationInfo? notificationInfo;
@@ -21,7 +21,7 @@ class NotificationController extends GetxController implements GetxService {
       };
 
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.notification);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

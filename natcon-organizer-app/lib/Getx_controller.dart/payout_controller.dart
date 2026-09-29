@@ -9,7 +9,7 @@ import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class PayOutController extends GetxController implements GetxService {
   PayoutInfo? payoutInfo;
@@ -33,7 +33,7 @@ class PayOutController extends GetxController implements GetxService {
         "orag_id": getData.read("UserLogin")["id"],
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.payoutlist);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -77,7 +77,7 @@ class PayOutController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.requestwithdraw);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

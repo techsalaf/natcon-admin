@@ -13,12 +13,11 @@ import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:magicmate_organizer/utils/Fontfamily.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../firebase/auth_firebase.dart';
 import '../utils/dark_light_mode.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,7 +25,7 @@ class LoginScreen extends StatefulWidget {
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
-List<String> status = ["Orgnizer", "SCANNER","MANAGER"];
+List<String> status = ["Admin", "Finance", "Registrar"];
 
 class _LoginScreenState extends State<LoginScreen> {
   final email = TextEditingController();
@@ -58,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String slectStatus = status.first;
-  String statusType = "Orgnizer";
+  String statusType = "Admin";
 
   @override
   Widget build(BuildContext context) {
@@ -233,13 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             }).toList(),
                             onChanged: (value) {
-                              if (value == "Orgnizer") {
-                                statusType = "Orgnizer";
-                              } else if (value == "SCANNER") {
-                                statusType = "SCANNER";
-                              }else if(value == "MANAGER"){
-                                statusType = "MANAGER";
-                              }
+                              statusType = value ?? "Admin";
                               setState(() {
                                 slectStatus = value ?? "";
                                 // listOfUser.add(selectValue);
@@ -313,7 +306,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 setState(() {
                                  isLoged = true;
                                 });
-                                login(email: email.text, password:  password.text, type: statusType != "Orgnizer" ? statusType : "Orgnizer");
+                                login(email: email.text, password:  password.text, type: statusType);
                                 // print("dfkdgjdfvfhvfu ${statusType}");
                               }
                             },
@@ -331,8 +324,6 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-  FirebaseAuthService firebaseAuthService = Get.put(FirebaseAuthService());
-
   bool isLoged = false;
   login({required String email, required String password, required String type}) async {
     try {
@@ -342,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
         "type": type
       };
       Uri uri = Uri.parse(AppUrl.login);
-      var response = await http.post(uri, body: jsonEncode(map));
+      var response = await NatconHttp.post(uri, body: jsonEncode(map));
       print("++++++++++++++++++++ ${response.body}");
       print("-------------------- ${map}");
 
@@ -359,17 +350,11 @@ class _LoginScreenState extends State<LoginScreen> {
         print("*********************${loginpage}");
 
         if (loginpage == "true") {
+          save("NATCON_ACCESS_TOKEN", result["AccessToken"]);
           print("+++++++++++++++ ${statusType}");
 
           print("Id: ${getData.read("UserLogin")["id"]}");
           OneSignal.User.addTagWithKey("orag_id", getData.read("UserLogin")["id"]);
-
-          if(statusType != "Orgnizer"){
-            firebaseAuthService.singInAndStoreData(uid: result["OragnizerLogin"]["id"], name: result["OragnizerLogin"]["name"], email: result["OragnizerLogin"]["email"], number: "", proPicPath: "");
-          }else{
-            print("vd gdgdgdg  ${result["OragnizerLogin"]["title"]}");
-            firebaseAuthService.singInAndStoreData(uid: result["OragnizerLogin"]["id"], name: result["OragnizerLogin"]["title"], email: result["OragnizerLogin"]["email"], number: result["OragnizerLogin"]["mobile"], proPicPath: result["OragnizerLogin"]["img"]);
-          }
 
           print("Name: ${result["OragnizerLogin"]["name"]}");
           print("Email: ${result["OragnizerLogin"]["email"]}");

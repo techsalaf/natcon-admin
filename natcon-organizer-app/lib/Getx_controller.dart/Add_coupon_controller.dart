@@ -8,7 +8,7 @@ import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class AddCouponlistController extends GetxController implements GetxService {
   CouponController couponlistController = Get.find();
@@ -158,7 +158,7 @@ class AddCouponlistController extends GetxController implements GetxService {
         "record_id": recordid,
       };
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.updatecoupon);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(data),
       );

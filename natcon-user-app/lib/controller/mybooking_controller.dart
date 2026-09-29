@@ -4,13 +4,13 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/mtticket_info.dart';
 import '../model/order_info.dart';
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class MyBookingController extends GetxController implements GetxService {
   OrderInfo? orderInfo;
@@ -36,7 +36,7 @@ class MyBookingController extends GetxController implements GetxService {
         "status": statusWise,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.myOrderHistory);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -59,7 +59,7 @@ class MyBookingController extends GetxController implements GetxService {
         "ticket_id": ticketId,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.ticketInformetion);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -85,7 +85,7 @@ class MyBookingController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.ticketCancle);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -115,7 +115,7 @@ class MyBookingController extends GetxController implements GetxService {
 
       print("!!!!!!!!!!!!!!!!" + map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.orderReview);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

@@ -14,7 +14,9 @@ import 'package:magicmate_organizer/Getx_controller.dart/Todayevent_controller.d
 import 'package:magicmate_organizer/Getx_controller.dart/eventdetails_controller.dart';
 import 'package:magicmate_organizer/Profile_Screen/Profilescreen.dart';
 import 'package:magicmate_organizer/api_screens/Api_werper.dart';
+import 'package:magicmate_organizer/api_screens/confrigation.dart';
 import 'package:magicmate_organizer/api_screens/data_store.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 import 'package:magicmate_organizer/utils/Colors.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:flutter/material.dart';
@@ -315,10 +317,18 @@ class _BottoBarScreenState extends State<BottoBarScreen> with WidgetsBindingObse
                 ),
                 Expanded(
                   child: InkWell(
-                    onTap: () {
+                    onTap: () async {
+                      final base = AppUrl.imageurl.replaceFirst(RegExp(r'/+$'), '');
+                      try {
+                        await NatconHttp.post(Uri.parse('$base/api/natcon.php?action=logout'), body: '{}');
+                      } catch (_) {
+                        // Local sign-out must still finish if the device is offline.
+                      }
                       setState(() {
                         getData.remove('Firstuser');
                         getData.remove('Remember');
+                        getData.remove('UserLogin');
+                        getData.remove('NATCON_ACCESS_TOKEN');
                         Get.offAll(LoginScreen());
                       });
                     },

@@ -3,17 +3,22 @@
 import 'dart:convert';
 import 'dart:developer';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
+import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:magicmate_organizer/utils/Colors.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 //! Api Call
 class ApiWrapper {
-  static var headers = {
-    'Content-Type': 'application/json',
-    'Cookie': 'PHPSESSID=oonu3ro0agbeiik4t0l6egt8ab'
-  };
+  static Map<String, String> get headers {
+    final token = getData.read('NATCON_ACCESS_TOKEN')?.toString() ?? '';
+    return {
+      'Content-Type': 'application/json',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+    };
+  }
   static doImageUpload(
       String endpoint, Map<String, String> params, List imgs) async {
     var request =
@@ -45,7 +50,7 @@ class ApiWrapper {
       print(url);
       print(method);
 
-      var request = await http.post(url, headers: headers, body: jsonEncode(method));
+      var request = await NatconHttp.post(url, headers: headers, body: jsonEncode(method));
       print("response----- ${request.body}");
       if (request.statusCode == 200) {
       var response = jsonDecode(request.body);
@@ -59,7 +64,7 @@ class ApiWrapper {
   static dataGet(appUrl) async {
     try {
       var url = Uri.parse(AppUrl.baseUrl + appUrl);
-      var request = await http.get(url, headers: headers);
+      var request = await NatconHttp.get(url, headers: headers);
       var response = jsonDecode(request.body);
       if (request.statusCode == 200) {
         return response;
@@ -74,7 +79,7 @@ class ApiWrapper {
 
   static dataGetLocation(appUrl) async {
     try {
-      var request = await http.get(appUrl, headers: headers);
+      var request = await NatconHttp.get(appUrl, headers: headers);
       var response = jsonDecode(request.body);
       if (request.statusCode == 200) {
         return response;

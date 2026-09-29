@@ -1,13 +1,35 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/bootstrap.php';
-use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover};
+use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken};
 $db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);migrate($db);$c=config();$checks=0;
 function delegateInput(string $name,string $email): array { return ['name'=>$name,'email'=>$email,'course'=>'Islamic Studies','institution'=>'Test University','level'=>'Graduate','whatsapp'=>'08000000000','calling_line'=>'','state_origin'=>'Osun','times_attended'=>'2']; }
 function check($yes,string $label): void {global $checks;if(!$yes)throw new RuntimeException($label);$checks++;}
 function rejects(callable $fn,string $label):void {try{$fn();}catch(InvalidArgumentException $e){check(true,$label);return;}throw new RuntimeException($label);}
 $tables=array_column($db->query("SELECT name FROM sqlite_master WHERE type='table'")->fetchAll(),'name');
-foreach(['natcon_accounts','natcon_categories','natcon_events','natcon_ticket_types','natcon_wallet_ledger','natcon_coupons','natcon_coupon_redemptions','natcon_favorites','natcon_reviews','natcon_referrals','natcon_payouts','natcon_event_media','natcon_artists','natcon_event_facilities','natcon_event_restrictions','natcon_faqs','natcon_pages','natcon_notifications','natcon_devices','natcon_chat_threads','natcon_chat_messages','natcon_otp_challenges'] as $table)check(in_array($table,$tables,true),'Mobile feature schema exists: '.$table);
+foreach(['natcon_accounts','natcon_mobile_tokens','natcon_categories','natcon_events','natcon_ticket_types','natcon_wallet_ledger','natcon_coupons','natcon_coupon_redemptions','natcon_favorites','natcon_reviews','natcon_referrals','natcon_payouts','natcon_event_media','natcon_artists','natcon_event_facilities','natcon_event_restrictions','natcon_faqs','natcon_pages','natcon_notifications','natcon_devices','natcon_chat_threads','natcon_chat_messages','natcon_otp_challenges'] as $table)check(in_array($table,$tables,true),'Mobile feature schema exists: '.$table);
+// Attendee accounts use password hashes and revocable bearer tokens for mobile clients.
+$account=createAccount($db,['name'=>'Account Test','email'=>'account@example.test','country_code'=>'+234','phone'=>'08001112222','password'=>'test-password-123']);
+check(strlen($account['access_token'])===64,'Account registration issues a mobile token');
+check(password_get_info(query($db,'SELECT password_hash FROM natcon_accounts WHERE id=?',[$account['id']])->fetchColumn())['algo']!==null,'Account password is hashed');
+$loggedIn=loginAccount($db,['ccode'=>'+234','mobile'=>'08001112222','password'=>'test-password-123']);
+check($loggedIn['id']===$account['id'],'Attendee phone and password login');
+rejects(fn()=>loginAccount($db,['ccode'=>'+234','mobile'=>'08001112222','password'=>'incorrect-password']),'Wrong attendee password rejected');
+$_SERVER['HTTP_AUTHORIZATION']='Bearer '.$loggedIn['access_token'];$authenticated=accountForToken($db);
+check((int)$authenticated['id']===(int)$account['id'],'Attendee bearer token resolves account');
+$updated=updateAccountProfile($db,(int)$account['id'],['name'=>'Updated Account','email'=>'updated@example.test']);
+check($updated['name']==='Updated Account'&&$updated['email']==='updated@example.test','Attendee profile update');
+$accountOrder=register($db,$c,['payer_name'=>'Updated Account','payer_email'=>'updated@example.test','payer_phone'=>'08001112222','consent'=>true,'delegates'=>[delegateInput('Account Delegate','account-delegate@example.test')] ],(int)$account['id']);
+check((int)query($db,'SELECT account_id FROM natcon_orders WHERE reference=?',[$accountOrder['reference']])->fetchColumn()===(int)$account['id'],'Authenticated registrations are owned by the attendee account');
+query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE token_hash=?',[Natcon\now(),hash('sha256',$loggedIn['access_token'])]);
+check(accountForToken($db)===null,'Revoked mobile token denied');
+unset($_SERVER['HTTP_AUTHORIZATION']);
+query($db,'INSERT INTO natcon_staff(name,email,password_hash,role) VALUES(?,?,?,?)',['Staff Test','mobile-staff@example.test',password_hash('staff-test-password',PASSWORD_DEFAULT),'registrar']);
+$staffId=(int)$db->lastInsertId();$staffToken=issueMobileToken($db,'staff',$staffId,'registrar');$_SERVER['HTTP_AUTHORIZATION']='Bearer '.$staffToken;
+$mobileStaff=staffForToken($db);check((int)$mobileStaff['id']===$staffId&&$mobileStaff['role']==='registrar','Organizer bearer token resolves canonical staff identity and role');
+query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE token_hash=?',[Natcon\now(),hash('sha256',$staffToken)]);
+check(staffForToken($db)===null,'Revoked staff mobile token denied');
+unset($_SERVER['HTTP_AUTHORIZATION']);
 $o=register($db,$c,['payer_name'=>'Test Payer','payer_email'=>'payer@example.test','payer_phone'=>'08000000000','amount_kobo'=>1,'consent'=>true,'delegates'=>[delegateInput('Delegate One','one@example.test'),delegateInput('Delegate Two','two@example.test')]]);
 check((int)$o['amount_kobo']===1600000,'Server prices group registration');check(!isset($o['delegates'][0]['ticket_token']),'Unpaid tokens hidden');
 $p=['status'=>'success','reference'=>$o['reference'],'amount'=>1600000,'currency'=>'NGN'];

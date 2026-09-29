@@ -5,22 +5,20 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:onesignal_flutter/onesignal_flutter.dart';
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
-import '../firebase/auth_firebase.dart';
 import '../screen/LoginAndSignup/login_screen.dart';
 import '../screen/bottombar_screen.dart';
 import '../utils/Custom_widget.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class LoginController extends GetxController implements GetxService {
   TextEditingController number = TextEditingController();
   TextEditingController password = TextEditingController();
 
-  FirebaseAuthService firebaseAuthService = Get.put(FirebaseAuthService());
 
   TextEditingController newPassword = TextEditingController();
   TextEditingController newConformPassword = TextEditingController();
@@ -87,7 +85,7 @@ class LoginController extends GetxController implements GetxService {
       Uri uri = Uri.parse(Config.baseurl + Config.loginApi);
       print("++++uri++++++++ ${uri}");
 
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -102,10 +100,10 @@ class LoginController extends GetxController implements GetxService {
         resultCheck = result["Result"];
         showToastMessage(userMessage);
         if (resultCheck == "true") {
+        save('NATCON_ACCESS_TOKEN', result['AccessToken']);
         print("+++++++++++++++" + getData.read("Firstuser").toString());
         save("UserLogin", result["UserLogin"]);
         OneSignal.User.addTagWithKey("user_id", getData.read("UserLogin")["id"]);
-          firebaseAuthService.singInAndStoreData(uid: result["UserLogin"]["id"], name: result["UserLogin"]["name"], email: result["UserLogin"]["email"], number: result["UserLogin"]["mobile"], proPicPath: result["UserLogin"]["pro_pic"] ?? "");
           print("Id: ${result["UserLogin"]["id"]}");
           print("Name: ${result["UserLogin"]["name"]}");
           print("Email: ${result["UserLogin"]["email"]}");
@@ -137,7 +135,7 @@ class LoginController extends GetxController implements GetxService {
         "password": newPassword.text,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.forgetPassword);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -163,7 +161,7 @@ class LoginController extends GetxController implements GetxService {
         "img": base64image,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.updateProfilePic);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

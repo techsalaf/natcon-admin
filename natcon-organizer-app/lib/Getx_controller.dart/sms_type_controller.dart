@@ -1,17 +1,17 @@
 import 'dart:convert';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Model class/msg_otp_model.dart';
 import '../api_screens/confrigation.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class SmsTypeController extends GetxController implements GetxService {
 
   SmsTypeModel? smsTypeModel;
   Future smsTypeApi() async{
     Map<String,String> userHeader = {"Content-type": "application/json", "Accept": "application/json"};
-    var response = await http.get(Uri.parse(AppUrl.baseUrl + AppUrl.smsType),headers: userHeader);
+    var response = await NatconHttp.get(Uri.parse(AppUrl.baseUrl + AppUrl.smsType),headers: userHeader);
 
     print("++++++++++++++++ ${response.body}");
 

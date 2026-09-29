@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get_state_manager/get_state_manager.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/coupon_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class CouponController extends GetxController implements GetxService {
   List<CouponInfo> couponList = [];
@@ -23,7 +23,7 @@ class CouponController extends GetxController implements GetxService {
         "sponsore_id": sponsoreID,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.couponlist);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -50,7 +50,7 @@ class CouponController extends GetxController implements GetxService {
         "cid": cid,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.couponCheck);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

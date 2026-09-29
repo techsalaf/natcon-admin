@@ -11,6 +11,18 @@ permissions:
   contents: read
 
 jobs:
+  mobile-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Evaluate shared NATCON mobile API contract
+        working-directory: services/mobile
+        run: |
+          node evals/staff-token.cjs
+          node evals/mobile-router.cjs
   analyze:
     runs-on: ubuntu-latest
     strategy:

@@ -15,7 +15,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,6 +23,7 @@ import '../Getx_controller.dart/sign_up_controller.dart';
 import '../Getx_controller.dart/sms_type_controller.dart';
 import '../Getx_controller.dart/twillio_otp_controller.dart';
 import '../utils/dark_light_mode.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class Singup extends StatefulWidget {
   static String verify = "";
@@ -456,7 +456,7 @@ class _SingupState extends State<Singup> {
       };
       print("-----------------==============" + map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.mobilecheck);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

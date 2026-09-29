@@ -26,6 +26,7 @@ import '../Getx_controller.dart/Dashboard_controller.dart';
 import '../firebase/chat_page.dart';
 import '../utils/dark_light_mode.dart';
 import 'language_screen.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -70,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   networkimageconvert() {
     (() async {
       http.Response response =
-          await http.get(Uri.parse(AppUrl.imageurl + networkimage.toString()));
+          await NatconHttp.get(Uri.parse(AppUrl.imageurl + networkimage.toString()));
       if (mounted) {
         print(response.bodyBytes);
         setState(() {

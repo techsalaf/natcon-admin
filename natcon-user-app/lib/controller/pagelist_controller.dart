@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get_state_manager/get_state_manager.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/pagelist_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class PageListController extends GetxController implements GetxService {
   PageListInfo? pageListInfo;
@@ -20,7 +20,7 @@ class PageListController extends GetxController implements GetxService {
   getPageListData() async {
     try {
       Uri uri = Uri.parse(Config.baseurl + Config.pageListApi);
-      var response = await http.post(uri);
+      var response = await NatconHttp.post(uri);
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         print(result.toString());
@@ -40,7 +40,7 @@ class PageListController extends GetxController implements GetxService {
       };
       print(map.toString());
       Uri uri = Uri.parse(Config.baseurl + Config.deletAccount);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

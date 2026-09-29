@@ -20,6 +20,7 @@ import '../helpar/routes_helpar.dart';
 import '../model/fontfamily_model.dart';
 import '../utils/Colors.dart';
 import 'LoginAndSignup/login_screen.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -77,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
   networkimageconvert() {
     (() async {
       http.Response response =
-          await http.get(Uri.parse(Config.imageUrl + networkimage.toString()));
+          await NatconHttp.get(Uri.parse(Config.imageUrl + networkimage.toString()));
       if (mounted) {
         print(response.bodyBytes);
         setState(() {

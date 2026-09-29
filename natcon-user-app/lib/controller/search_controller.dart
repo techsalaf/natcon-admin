@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/search_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class SearchController extends GetxController implements GetxService {
   List<SearchInfo> searchInfo = [];
@@ -20,7 +20,7 @@ class SearchController extends GetxController implements GetxService {
         "keyword": keyWord,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.searchEvent);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

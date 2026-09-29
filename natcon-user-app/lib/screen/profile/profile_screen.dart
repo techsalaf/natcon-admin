@@ -27,6 +27,7 @@ import '../bottombar_screen.dart';
 import '../language/language_screen.dart';
 import 'faq_screen.dart';
 import 'notification_screen.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -66,7 +67,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   networkimageconvert() {
     (() async {
       http.Response response =
-          await http.get(Uri.parse(Config.imageUrl + networkimage.toString()));
+          await NatconHttp.get(Uri.parse(Config.imageUrl + networkimage.toString()));
       if (mounted) {
         print(response.bodyBytes);
         setState(() {
@@ -649,11 +650,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Expanded(
                   child: InkWell(
                     onTap: () async {
-                      setState(() async {
+                      final base = Config.imageUrl.replaceFirst(RegExp(r'/+$'), '');
+                      try {
+                        await NatconHttp.post(Uri.parse('$base/api/natcon.php?action=account_logout'), body: '{}');
+                      } catch (_) {
+                        // Local sign-out must still finish if the device is offline.
+                      }
+                      try {
+                        await FirebaseMessaging.instance.deleteToken();
+                      } catch (_) {
+                        // Push token cleanup must not block local sign-out.
+                      }
+                      setState(() {
                         save('isLoginBack', true);
                         getData.remove('Firstuser');
                         getData.remove("UserLogin");
-                        await FirebaseMessaging.instance.deleteToken();
+                        getData.remove('NATCON_ACCESS_TOKEN');
                         Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(

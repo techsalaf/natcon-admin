@@ -3,11 +3,11 @@
 import 'dart:convert';
 
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
 import '../model/fav_info.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class FavoriteController extends GetxController implements GetxService {
   List<FevInfo> favList = [];
@@ -18,7 +18,7 @@ class FavoriteController extends GetxController implements GetxService {
         "uid": getData.read("UserLogin")["id"],
       };
       Uri uri = Uri.parse(Config.baseurl + Config.favoriteList);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

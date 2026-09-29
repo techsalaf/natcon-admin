@@ -39,7 +39,9 @@ The existing NATCON attendee app, organizer app, and web console use one authent
 - Add contract tests and evaluation scenarios for success, invalid input, wrong role, unauthenticated calls, duplicate payment callbacks, and duplicate scans.
 - Acceptance: web and mobile contract tests prove they address the same user, event, order, ticket, wallet ledger, and role permissions.
 
-**First schema slice implemented locally:** repeatable migrations now provision 22 NATCON-owned tables for these domains and add nullable ownership/event/ticket/coupon/amount columns to existing NATCON orders plus optional account linkage on delegates. The current checkout still uses its existing server price and ignores these new commerce tables; API workflows, seed data, backfill and production deployment remain pending.
+**Implemented locally:** repeatable migrations provision 23 NATCON-owned tables for attendee accounts/tokens, multi-event commerce, wallet, coupons, reviews, favourites, referrals, payouts, notifications, chat, and content; legacy NATCON orders and delegates are extended additively. Native attendee and staff bearer-token authentication is implemented, including role enforcement through the canonical staff table. The compatibility router supports attendee register/login/profile, canonical Admin/Finance/Registrar login, organizer dashboard metrics, and one-person ticket scanning against the same NATCON check-in records as the web console.
+
+**Still pending:** attendee discovery, checkout/history, wallet/coupon, social/content and messaging flows, plus organizer event/ticket CMS, finance payout, notification, and manager administration workflows. The new domain tables are not all wired to app workflows. No production schema, API, or routing changes have been applied.
 
 ### 3. Adapt the existing Flutter clients
 
@@ -70,3 +72,4 @@ The existing NATCON attendee app, organizer app, and web console use one authent
 - 2026-09-29: User confirmed all existing features must be added to the shared NATCON backend. Both original Flutter app entry points are restored locally from project import commit `31c6a2d`; current screens are preserved while API/data integration proceeds.
 - 2026-09-29: Added the full app feature/API matrix and updated mobile setup docs. Both app entrypoint regression tests and four-scenario entrypoint evaluations per app pass. CI now runs these checks.
 - 2026-09-29: Added initial additive NATCON schemas for all inventoried mobile feature domains. SQLite gate/eval checks assert all 22 tables exist and that running migrations twice is safe. These schemas are not yet connected to app/API workflows.
+- 2026-09-29: Added revocable attendee/staff bearer tokens, attendee account endpoints, compatibility login/profile routes, canonical staff role labels in the organizer login UI, organizer dashboard translation, and per-ticket QR/booking scan routing to NATCON check-in. Both apps now revoke server tokens on sign-out and use NATCON authentication without a Firebase-auth dependency. This slice remains local pending full endpoint coverage and release validation.

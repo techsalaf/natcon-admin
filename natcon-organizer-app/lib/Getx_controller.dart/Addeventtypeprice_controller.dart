@@ -10,7 +10,7 @@ import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 class AddeventtypepriceController extends GetxController
     implements GetxService {
@@ -68,7 +68,7 @@ class AddeventtypepriceController extends GetxController
       };
       print(data.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.edittype);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(data),
       );
@@ -114,7 +114,7 @@ class AddeventtypepriceController extends GetxController
       };
       print(map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.addtype);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );

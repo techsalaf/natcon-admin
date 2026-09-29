@@ -2,9 +2,9 @@ import 'dart:convert';
 
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import '../Model class/twilio_otp_model.dart';
 import '../api_screens/confrigation.dart';
+import 'package:magicmate_organizer/api_screens/natcon_http.dart';
 
 
 class TwilioOtpController extends GetxController implements GetxService {
@@ -16,7 +16,7 @@ class TwilioOtpController extends GetxController implements GetxService {
       "mobile": mobile
     };
     Map<String, String> userHeader = {"Content-type": "application/json", "Accept": "application/json"};
-    var response = await http.post(Uri.parse(AppUrl.baseUrl + AppUrl.twilioOtp),body: jsonEncode(body),headers: userHeader);
+    var response = await NatconHttp.post(Uri.parse(AppUrl.baseUrl + AppUrl.twilioOtp),body: jsonEncode(body),headers: userHeader);
 
     print("+++++++ ${response.body}");
     print("----- $body");

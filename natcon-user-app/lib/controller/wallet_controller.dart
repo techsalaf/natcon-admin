@@ -4,7 +4,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 
 import '../Api/config.dart';
 import '../Api/data_store.dart';
@@ -12,6 +11,7 @@ import '../model/payment_info.dart';
 import '../model/wallet_info.dart';
 import '../utils/Custom_widget.dart';
 import 'home_controller.dart';
+import 'package:magicmate_user/Api/natcon_http.dart';
 
 class WalletController extends GetxController implements GetxService {
   TextEditingController amount = TextEditingController();
@@ -37,7 +37,7 @@ class WalletController extends GetxController implements GetxService {
         "uid": getData.read("UserLogin")["id"].toString(),
       };
       Uri uri = Uri.parse(Config.baseurl + Config.walletReportApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -64,7 +64,7 @@ class WalletController extends GetxController implements GetxService {
         "wallet": amount.text,
       };
       Uri uri = Uri.parse(Config.baseurl + Config.walletUpdateApi);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -92,7 +92,7 @@ class WalletController extends GetxController implements GetxService {
         "uid": getData.read("UserLogin")["id"].toString(),
       };
       Uri uri = Uri.parse(Config.baseurl + Config.referAndEarn);
-      var response = await http.post(
+      var response = await NatconHttp.post(
         uri,
         body: jsonEncode(map),
       );
@@ -114,7 +114,7 @@ class WalletController extends GetxController implements GetxService {
     try {
       isLoading = false;
       Uri uri = Uri.parse(Config.baseurl + Config.paymentgatewayApi);
-      var response = await http.post(uri);
+      var response = await NatconHttp.post(uri);
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         paymentInfo = PaymentInfo.fromJson(result);
