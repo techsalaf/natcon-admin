@@ -367,6 +367,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                                                             .eventInfo
                                                             ?.eventData
                                                             .sponsoreId,
+                                                    subtotal: subtotal,
                                                   );
                                                   Get.toNamed(
                                                     Routes.couponScreen,
@@ -745,6 +746,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
       final order = await bookEventController.createNatconOrder(
         account: Map<String, dynamic>.from(account),
         delegates: delegates,
+        couponCode: couponCode,
       );
       final amountKobo = (order['amount_kobo'] as num?)?.toInt() ?? 0;
       final confirm = await Get.dialog<bool>(AlertDialog(

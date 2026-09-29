@@ -51,6 +51,17 @@ try {
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Favorites loaded.','FavEventData'=>\Natcon\favoriteEvents($db,(int)$account['id'])]);
     }
+    if($client==='user_api'&&$endpoint==='u_couponlist.php'){
+        if(!accountForToken($db))mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['Result'=>'true','ResponseMsg'=>'Coupons loaded.','couponlist'=>\Natcon\availableCoupons($db,max(0,(int)($in['subtotal_kobo']??0)))]);
+    }
+    if($client==='user_api'&&$endpoint==='u_check_coupon.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        $coupon=query($db,'SELECT code,minimum_kobo FROM natcon_coupons WHERE id=?',[clean($in['cid']??'',64)])->fetch();
+        if(!$coupon)mobileReply(['Result'=>'false','ResponseMsg'=>'Coupon not found.']);
+        try{\Natcon\applicableCoupon($db,(string)$coupon['code'],(int)$coupon['minimum_kobo']);mobileReply(['Result'=>'true','ResponseMsg'=>'Coupon is valid. The final discount will be calculated by NATCON at checkout.']);}
+        catch(InvalidArgumentException $e){mobileReply(['Result'=>'false','ResponseMsg'=>$e->getMessage()]);}
+    }
     if($client==='user_api'&&$endpoint==='notification.php'){
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Notifications loaded.','NotificationData'=>\Natcon\mobileNotifications($db,(int)$account['id'])]);

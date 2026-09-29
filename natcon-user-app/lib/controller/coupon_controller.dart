@@ -16,11 +16,12 @@ class CouponController extends GetxController implements GetxService {
   String copResult = "";
   String couponMsg = "";
 
-  getCouponDataApi({String? sponsoreID}) async {
+  getCouponDataApi({String? sponsoreID, double? subtotal}) async {
     try {
       Map map = {
         "uid": getData.read("UserLogin")["id"],
         "sponsore_id": sponsoreID,
+        "subtotal_kobo": ((subtotal ?? 0) * 100).round(),
       };
       Uri uri = Uri.parse(Config.baseurl + Config.couponlist);
       var response = await NatconHttp.post(

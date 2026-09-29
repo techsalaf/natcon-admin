@@ -88,9 +88,11 @@ try {
         $ref=clean($in['reference']??'');$status=clean($in['status']??'',20);$reason=clean($in['reason']??'',1000);
         if(!in_array($status,['cancelled','refunded'],true)||strlen($reason)<10)throw new InvalidArgumentException('Choose a valid status and enter the reconciliation reason.');
         $db->beginTransaction();try{
-            $o=query($db,'SELECT status FROM natcon_orders WHERE reference=?',[$ref])->fetch();
+            $o=query($db,'SELECT status,coupon_id FROM natcon_orders WHERE reference=?',[$ref])->fetch();
             if(!$o||in_array($o['status'],['cancelled','refunded'],true))throw new InvalidArgumentException('This registration cannot be changed.');
-            query($db,'UPDATE natcon_orders SET status=? WHERE reference=?',[$status,$ref]);audit($db,(string)$user['id'],'order_'.$status,$ref,['reason'=>$reason]);$db->commit();
+            query($db,'UPDATE natcon_orders SET status=? WHERE reference=?',[$status,$ref]);
+            if($o['coupon_id'])\Natcon\releaseCouponRedemption($db,(int)$o['coupon_id'],$ref);
+            audit($db,(string)$user['id'],'order_'.$status,$ref,['reason'=>$reason]);$db->commit();
         }catch(Throwable $e){$db->rollBack();throw $e;}
         respond(['status'=>$status]);
     }

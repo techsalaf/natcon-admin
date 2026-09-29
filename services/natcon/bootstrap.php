@@ -164,6 +164,26 @@ function favoriteEvents(\PDO $db,int $accountId): array {
 function mobileFaqs(\PDO $db): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'store_id'=>null,'question'=>$r['question'],'answer'=>$r['answer'],'status'=>$r['status']],query($db,"SELECT id,question,answer,status FROM natcon_faqs WHERE status IN ('active','published') ORDER BY sort_order,id")->fetchAll());}
 function mobilePages(\PDO $db): array {return array_map(static fn($r)=>['title'=>$r['title'],'description'=>$r['content']],query($db,"SELECT title,content FROM natcon_pages WHERE status='published' ORDER BY title")->fetchAll());}
 function mobileNotifications(\PDO $db,int $accountId): array {return array_map(static fn($r)=>['id'=>(string)$r['id'],'uid'=>(string)$r['account_id'],'datetime'=>$r['created_at'],'title'=>$r['title'],'description'=>$r['body']],query($db,'SELECT id,account_id,title,body,created_at FROM natcon_notifications WHERE account_id=? ORDER BY created_at DESC,id DESC',[$accountId])->fetchAll());}
+function availableCoupons(\PDO $db,int $subtotalKobo=0): array {
+    $event=primaryConference($db);$rows=query($db,"SELECT * FROM natcon_coupons WHERE status='active' AND (event_id IS NULL OR event_id=?) AND (expires_at IS NULL OR DATE(expires_at)>=?) AND (usage_limit=0 OR usage_count<usage_limit) ORDER BY id DESC",[$event['id'],gmdate('Y-m-d')])->fetchAll();
+    return array_map(static function($r)use($subtotalKobo){$expiry=$r['expires_at']?:'2026-12-31 23:59:59';$discount=$r['discount_type']==='percent'?(int)floor($subtotalKobo*(int)$r['discount_value']/100):(int)$r['discount_value'];$value=number_format(min($subtotalKobo,max(0,$discount))/100,2,'.','');return ['id'=>(string)$r['id'],'c_img'=>'','expire_date'=>substr((string)$expiry,0,10),'description'=>$r['title'],'coupon_val'=>$value,'coupon_code'=>$r['code'],'coupon_title'=>$r['title'],'coupon_subtitle'=>$r['title'],'min_amt'=>number_format((int)$r['minimum_kobo']/100,2,'.','')];},$rows);
+}
+function applicableCoupon(\PDO $db,string $code,int $subtotal): array {
+    $event=primaryConference($db);$coupon=query($db,"SELECT * FROM natcon_coupons WHERE code=? AND status='active' AND (event_id IS NULL OR event_id=?) AND (expires_at IS NULL OR DATE(expires_at)>=?) AND (usage_limit=0 OR usage_count<usage_limit)",[$code,$event['id'],gmdate('Y-m-d')])->fetch();
+    if(!$coupon)throw new \InvalidArgumentException('This coupon is invalid, expired, or fully redeemed.');
+    if($subtotal<(int)$coupon['minimum_kobo'])throw new \InvalidArgumentException('The order does not meet this coupon’s minimum spend.');
+    if($coupon['discount_type']==='percent'){
+        if((int)$coupon['discount_value']<1||(int)$coupon['discount_value']>100)throw new \RuntimeException('Coupon percentage is misconfigured.');
+        $discount=(int)floor($subtotal*(int)$coupon['discount_value']/100);
+    }elseif($coupon['discount_type']==='fixed')$discount=(int)$coupon['discount_value'];
+    else throw new \RuntimeException('Coupon type is misconfigured.');
+    return [$coupon,min($subtotal,max(0,$discount))];
+}
+function releaseCouponRedemption(\PDO $db,int $couponId,string $reference): bool {
+    $deleted=query($db,'DELETE FROM natcon_coupon_redemptions WHERE coupon_id=? AND order_reference=?',[$couponId,$reference]);
+    if(!$deleted->rowCount())return false;
+    query($db,'UPDATE natcon_coupons SET usage_count=CASE WHEN usage_count>0 THEN usage_count-1 ELSE 0 END WHERE id=?',[$couponId]);return true;
+}
 function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
 function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
 function event(array $c,?\PDO $db=null): array {
@@ -189,15 +209,21 @@ function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
         foreach(['course','institution','level','whatsapp','state_origin'] as $required) if(!clean($d[$required]??'')) throw new \InvalidArgumentException('Complete each delegate’s course, institution, level, WhatsApp number, and state of origin.');
         if(!preg_match('/^\d{1,2}$/',clean($d['times_attended']??'')) || (int)$d['times_attended']>99) throw new \InvalidArgumentException('Enter NATCON attendance from 0 to 99.');
     }
-    $canonical=event($c,$db);$eventId=(int)$canonical['event_id'];$type=activeTicketType($db,$eventId);$ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$amount=(int)$type['price_kobo']*count($delegates);
+    $canonical=event($c,$db);$eventId=(int)$canonical['event_id'];$type=activeTicketType($db,$eventId);$ref='TAA-'.strtoupper(bin2hex(random_bytes(6)));$token=bin2hex(random_bytes(32));$subtotal=(int)$type['price_kobo']*count($delegates);$couponCode=clean($in['coupon_code']??'',64);$coupon=null;$discount=0;$amount=$subtotal;
     $db->beginTransaction();try {
         // Serialize capacity reservation across workers, including SQLite test deployments.
         query($db,"UPDATE natcon_locks SET value=value+1 WHERE name='registration'");
         $reserved=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status IN ('pending','awaiting_review','paid') AND o.event_id=?",[$eventId])->fetchColumn();
         if((int)$type['capacity']>0 && $reserved+count($delegates)>(int)$type['capacity'])throw new \InvalidArgumentException('Registration capacity has been reached. Contact the organizers.');
-        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id,event_id,ticket_type_id,subtotal_kobo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now(),$accountId,$eventId,$type['id'],$amount]);
+        if($couponCode!==''){
+            if(!$accountId)throw new \InvalidArgumentException('Sign in to redeem a coupon.');
+            [$coupon,$discount]=applicableCoupon($db,$couponCode,$subtotal);$amount=$subtotal-$discount;
+            $updated=query($db,'UPDATE natcon_coupons SET usage_count=usage_count+1 WHERE id=? AND status=? AND (usage_limit=0 OR usage_count<usage_limit)',[$coupon['id'],'active']);if(!$updated->rowCount())throw new \InvalidArgumentException('This coupon was just fully redeemed.');
+        }
+        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id,event_id,ticket_type_id,subtotal_kobo,coupon_id,discount_kobo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,'NGN','pending',now(),$accountId,$eventId,$type['id'],$subtotal,$coupon['id']??null,$discount]);
+        if($coupon)query($db,'INSERT INTO natcon_coupon_redemptions(coupon_id,account_id,order_reference,discount_kobo,created_at) VALUES(?,?,?,?,?)',[$coupon['id'],$accountId,$ref,$discount,now()]);
         foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['chapter']??'',150),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
-        audit($db,'public','registered',$ref,['delegates'=>count($delegates),'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
+        audit($db,'public','registered',$ref,['delegates'=>count($delegates),'coupon_id'=>$coupon['id']??null,'discount_kobo'=>$discount,'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}
     return order($db,$ref,$token)+['payment_enabled'=>$c['secret']!==''];
 }

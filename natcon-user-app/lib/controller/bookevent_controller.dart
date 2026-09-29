@@ -46,6 +46,7 @@ class BookEventController extends GetxController implements GetxService {
   Future<Map<String, dynamic>> createNatconOrder({
     required Map<String, dynamic> account,
     required List<Map<String, String>> delegates,
+    String couponCode = '',
   }) => _natconRequest(
     'register',
     body: {
@@ -53,6 +54,7 @@ class BookEventController extends GetxController implements GetxService {
       'payer_email': account['email'],
       'payer_phone': '${account['ccode'] ?? ''}${account['mobile'] ?? ''}',
       'consent': true,
+      if (couponCode.trim().isNotEmpty) 'coupon_code': couponCode.trim(),
       'delegates': delegates,
     },
   );
