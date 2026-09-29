@@ -13,6 +13,7 @@ const checks = [
   ['organizer HTTP client sends tokens only to NATCON API paths', organizerAuth.includes("uri.path.contains('/orag_api/')") && organizerAuth.includes("headers['Authorization'] = 'Bearer $token'")],
   ['mobile account login and registration use NATCON-owned accounts', router.includes("$endpoint==='u_reg_user.php'") && router.includes('createAccount($db,$in)') && router.includes('loginAccount($db,$in)')],
   ['both apps revoke their server token and clear it on sign-out', organizerShell.includes("action=logout") && organizerShell.includes("remove('NATCON_ACCESS_TOKEN')") && attendeeProfile.includes('action=account_logout') && attendeeProfile.includes("remove('NATCON_ACCESS_TOKEN')")],
+  ['attendee history and ticket detail are routed through account-owned service functions', router.includes("ticket_status_wise.php") && router.includes('mobileTicketHistory($db,(int)$account[\'id\'],$c)') && router.includes('mobileTicketInfo($db,(int)$account[\'id\'],$token,$c)')],
 ];
 for (const [name, passed] of checks) console.log(`${passed ? 'PASS' : 'FAIL'} ${name}`);
 if (checks.some(([, passed]) => !passed)) process.exitCode = 1;

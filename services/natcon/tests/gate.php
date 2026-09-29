@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/bootstrap.php';
-use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken};
+use function Natcon\{config,migrate,register,confirmPayment,query,order,checkin,delegate,recover,createAccount,loginAccount,accountForToken,updateAccountProfile,staffForToken,issueMobileToken,mobileTicketHistory,mobileTicketInfo};
 $db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);migrate($db);migrate($db);$c=config();$checks=0;
 function delegateInput(string $name,string $email): array { return ['name'=>$name,'email'=>$email,'course'=>'Islamic Studies','institution'=>'Test University','level'=>'Graduate','whatsapp'=>'08000000000','calling_line'=>'','state_origin'=>'Osun','times_attended'=>'2']; }
 function check($yes,string $label): void {global $checks;if(!$yes)throw new RuntimeException($label);$checks++;}
@@ -21,6 +21,11 @@ $updated=updateAccountProfile($db,(int)$account['id'],['name'=>'Updated Account'
 check($updated['name']==='Updated Account'&&$updated['email']==='updated@example.test','Attendee profile update');
 $accountOrder=register($db,$c,['payer_name'=>'Updated Account','payer_email'=>'updated@example.test','payer_phone'=>'08001112222','consent'=>true,'delegates'=>[delegateInput('Account Delegate','account-delegate@example.test')] ],(int)$account['id']);
 check((int)query($db,'SELECT account_id FROM natcon_orders WHERE reference=?',[$accountOrder['reference']])->fetchColumn()===(int)$account['id'],'Authenticated registrations are owned by the attendee account');
+query($db,"UPDATE natcon_orders SET status='paid' WHERE reference=?",[$accountOrder['reference']]);$accountTickets=mobileTicketHistory($db,(int)$account['id'],$c);
+check(count($accountTickets)===1&&$accountTickets[0]['event_title']===$c['name'],'Attendee history lists only paid tickets for the signed-in account');
+$accountTicket=mobileTicketInfo($db,(int)$account['id'],$accountTickets[0]['ticket_id'],$c);
+check($accountTicket['ticket_email']==='account-delegate@example.test'&&$accountTicket['qrcode']===$accountTicket['ticket_id'],'Attendee can retrieve their own canonical QR ticket');
+rejects(fn()=>mobileTicketInfo($db,(int)$account['id']+999,$accountTickets[0]['ticket_id'],$c),'Another account cannot retrieve a paid attendee ticket');
 query($db,'UPDATE natcon_mobile_tokens SET revoked_at=? WHERE token_hash=?',[Natcon\now(),hash('sha256',$loggedIn['access_token'])]);
 check(accountForToken($db)===null,'Revoked mobile token denied');
 unset($_SERVER['HTTP_AUTHORIZATION']);

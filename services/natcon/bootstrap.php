@@ -108,6 +108,17 @@ function updateAccountProfile(\PDO $db,int $id,array $in): array {
     try{query($db,'UPDATE natcon_accounts SET name=?,email=?,updated_at=? WHERE id=?',[$name,$email,now(),$id]);}catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('That email is already used by another account.');throw $e;}
     return query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();
 }
+function mobileTicketHistory(\PDO $db,int $accountId,array $c): array {
+    $orders=query($db,"SELECT o.reference,o.created_at,o.paid_at,d.ticket_token,d.name FROM natcon_orders o JOIN natcon_delegates d ON d.reference=o.reference WHERE o.account_id=? AND o.status='paid' ORDER BY o.created_at DESC,d.id ASC",[$accountId])->fetchAll();
+    $data=[];foreach($orders as $ticket)$data[]=['event_id'=>'NATCON-2026','event_title'=>$c['name'],'event_img'=>'','event_sdate'=>$c['start_date'],'event_place_name'=>$c['venue'],'ticket_id'=>$ticket['ticket_token'],'total_ticket'=>'1','ticket_type'=>'Delegate','book_mintues'=>0];
+    return $data;
+}
+function mobileTicketInfo(\PDO $db,int $accountId,string $token,array $c): array {
+    $ticket=query($db,"SELECT d.*,o.payer_name,o.payer_email,o.payer_phone,o.amount_kobo,o.bank_reference,o.reference,o.status FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE d.ticket_token=? AND o.account_id=? AND o.status='paid'",[$token,$accountId])->fetch();
+    if(!$ticket)throw new \InvalidArgumentException('Paid ticket not found in this account.');
+    $paidCount=max(1,(int)query($db,'SELECT COUNT(*) FROM natcon_delegates WHERE reference=?',[$ticket['reference']])->fetchColumn());$unit=round((int)$ticket['amount_kobo']/$paidCount);$amount=number_format($unit/100,2,'.','');
+    return ['ticket_id'=>$ticket['ticket_token'],'ticket_title'=>$c['name'],'start_time'=>$c['start_date'],'event_address'=>$c['venue'],'event_address_title'=>$c['venue'],'event_latitude'=>'0','event_longtitude'=>'0','sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_title'=>'The Achiever Ambassadors Islamic Foundation','qrcode'=>$ticket['ticket_token'],'unique_code'=>$ticket['reference'],'ticket_username'=>$ticket['name'],'ticket_mobile'=>$ticket['whatsapp']?:$ticket['phone'],'ticket_email'=>$ticket['email'],'ticket_rate'=>'0','ticket_type'=>'Delegate','total_ticket'=>'1','ticket_subtotal'=>$amount,'ticket_cou_amt'=>'0','ticket_wall_amt'=>'0','ticket_tax'=>'0','ticket_total_amt'=>$amount,'ticket_p_method'=>$ticket['bank_reference']?'Bank Transfer':'Paystack','ticket_transaction_id'=>$ticket['bank_reference']?:$ticket['reference'],'ticket_status'=>'paid'];
+}
 function clean($v,int $max=190): string { if (!is_scalar($v) && $v!==null) throw new \InvalidArgumentException('Invalid field value.'); return mb_substr(trim((string)$v),0,$max); }
 function audit(\PDO $db,string $actor,string $action,string $reference='',array $detail=[]): void { query($db,'INSERT INTO natcon_audit(actor,action,reference,detail,created_at) VALUES(?,?,?,?,?)',[$actor,$action,$reference,json_encode($detail),now()]); }
 function event(array $c): array { $date=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');return array_intersect_key($c,array_flip(['name','theme','start_date','end_date','venue','currency','earlybird_end','bank']))+['price_kobo'=>$date<=$c['earlybird_end']?700000:800000,'payment_enabled'=>$c['secret']!=='']; }

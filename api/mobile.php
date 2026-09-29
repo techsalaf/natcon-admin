@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile};
+use function Natcon\{config,database,query,clean,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,mobileTicketHistory,mobileTicketInfo};
 
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -79,6 +79,15 @@ try {
         if((string)($in['uid']??'')!==(string)$account['id'])mobileReply(['Result'=>'false','ResponseMsg'=>'Account does not match this session.'],403);
         $updated=updateAccountProfile($db,(int)$account['id'],$in);
         mobileReply(['Result'=>'true','ResponseMsg'=>'Profile updated.','UserLogin'=>mobileAccountPayload($updated)]);
+    }
+    if($client==='user_api'&&$endpoint==='ticket_status_wise.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Tickets loaded.','order_data'=>mobileTicketHistory($db,(int)$account['id'],$c)]);
+    }
+    if($client==='user_api'&&$endpoint==='ticket_information.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        $token=clean($in['ticket_id']??'',64);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket loaded.','TicketData'=>mobileTicketInfo($db,(int)$account['id'],$token,$c)]);
     }
     mobileReply(['Result'=>'false','ResponseMsg'=>'This feature is not connected to NATCON yet.'],404);
 } catch(InvalidArgumentException $e) {
