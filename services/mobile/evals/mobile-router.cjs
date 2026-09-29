@@ -11,6 +11,7 @@ const attendeeProfile = read('natcon-user-app/lib/screen/profile/profile_screen.
 const attendeeCheckout = read('natcon-user-app/lib/screen/order_details.dart');
 const delegateForm = read('natcon-user-app/lib/screen/natcon_delegate_details.dart');
 const attendeeApi = read('natcon-user-app/lib/controller/bookevent_controller.dart');
+const attendeeAuth = read('natcon-user-app/lib/Api/natcon_http.dart');
 const checks = [
   ['organizer UI exposes the three canonical staff roles', ['Admin', 'Finance', 'Registrar'].every(role => organizerLogin.includes(`"${role}"`))],
   ['legacy organizer role values map to NATCON server roles', router.includes("'admin'=>'Orgnizer','finance'=>'MANAGER','registrar'=>'SCANNER'")],
@@ -28,6 +29,8 @@ const checks = [
   ['attendee coupons are listed and validated by NATCON and sent with checkout', ['u_couponlist.php','u_check_coupon.php'].every(endpoint => router.includes(endpoint)) && router.includes('availableCoupons($db') && router.includes('applicableCoupon($db') && attendeeApi.includes("'coupon_code': couponCode.trim()")],
   ['wallet balance and top-ups require NATCON Paystack verification', natconApi.includes("$action==='wallet_initialize'") && natconApi.includes("$action==='wallet_verify'") && natconApi.includes('confirmWalletTopup($db') && router.includes("$endpoint==='u_wallet_up.php'") && router.includes('Wallet credits are added only after NATCON verifies your payment.') && read('natcon-user-app/lib/screen/addwallet/addwallet_screen.dart').includes('initializeNatconTopup()')],
   ['attendee wallet checkout sends the opt-in to server-side checkout math', attendeeCheckout.includes('useWallet: status == true') && attendeeApi.includes("if (useWallet) 'use_wallet': true") && read('services/natcon/bootstrap.php').includes("'SPEND-'.$ref")],
+  ['reviews require a paid account-owned ticket and appear in shared event details', router.includes("$endpoint==='rate_update.php'") && router.includes('submitReview($db,(int)$account[\'id\']') && router.includes("mobileReviews($db,(int)$primary['id'])") && read('natcon-user-app/lib/controller/mybooking_controller.dart').includes("'ticket_id': orderID") && attendeeAuth.includes("uri.path.endsWith('/api/mobile.php')") && attendeeAuth.includes("uri.queryParameters['client']")],
+  ['signup referral codes are validated and conversion tracking remains reward-free', read('natcon-user-app/lib/controller/signup_controller.dart').includes('referralCode.text.trim()') && router.includes("$endpoint==='getdata.php'") && router.includes('referralSummary($db,(int)$account[\'id\'])') && read('services/natcon/bootstrap.php').includes('markReferralConverted($db,(int)$o[\'account_id\'])') && read('natcon-user-app/lib/screen/profile/refer&earn_screen.dart').includes('Wallet rewards are currently disabled.')],
 ];
 for (const [name, passed] of checks) console.log(`${passed ? 'PASS' : 'FAIL'} ${name}`);
 if (checks.some(([, passed]) => !passed)) process.exitCode = 1;

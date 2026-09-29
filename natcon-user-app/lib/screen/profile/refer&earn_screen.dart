@@ -85,7 +85,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                   height: 20,
                 ),
                 Text(
-                  "${"Earn".tr} ${currency + walletController.refercredit} ${"for Each\n Friend you refer".tr}",
+                  "Share your NATCON referral code".tr,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 20,
@@ -139,7 +139,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                             width: 15,
                           ),
                           Text(
-                            "${"Friend get".tr} ${currency + walletController.refercredit} ${"on their first complete\ntransaction".tr}",
+                            "Referral signups are tracked here. Wallet rewards are currently disabled.".tr,
                             textAlign: TextAlign.start,
                             style: TextStyle(
                               fontFamily: FontFamily.gilroyMedium,
@@ -164,7 +164,7 @@ class _ReferFriendScreenState extends State<ReferFriendScreen> {
                             width: 15,
                           ),
                           Text(
-                            "${"You get".tr} ${currency + walletController.signupcredit} ${"on your wallet".tr}",
+                            "${walletController.referralCount} signups · ${walletController.convertedReferralCount} completed a paid ticket".tr,
                             textAlign: TextAlign.start,
                             style: TextStyle(
                               fontFamily: FontFamily.gilroyMedium,

@@ -93,10 +93,20 @@ function staffForToken(\PDO $db): ?array {
 function createAccount(\PDO $db,array $in): array {
     $name=clean($in['name']??'',150);$email=strtolower(clean($in['email']??'',190));$country=clean($in['country_code']??$in['ccode']??'',12);$phone=clean($in['phone']??$in['mobile']??'',40);$password=(string)($in['password']??'');
     if(!$name||!filter_var($email,FILTER_VALIDATE_EMAIL)||!$phone||!preg_match('/^[+0-9 -]{6,40}$/',$phone)||strlen($password)<8||strlen($password)>128)throw new \InvalidArgumentException('Provide your name, a valid email, phone number, and password of at least 8 characters.');
+    $referralCode=strtoupper(clean($in['refercode']??$in['referral_code']??'',32));$referrer=null;
+    if($referralCode!==''){$referrer=query($db,'SELECT id FROM natcon_accounts WHERE referral_code=? AND status=?',[$referralCode,'active'])->fetchColumn();if(!$referrer)throw new \InvalidArgumentException('That referral code is not valid.');}
     $referral=strtoupper(bin2hex(random_bytes(6)));
-    try{query($db,'INSERT INTO natcon_accounts(name,email,country_code,phone,password_hash,referral_code,status,created_at) VALUES(?,?,?,?,?,?,?,?)',[$name,$email,$country,$phone,password_hash($password,PASSWORD_DEFAULT),$referral,'active',now()]);}
-    catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('An account already uses that email or phone number.');throw $e;}
-    $id=(int)$db->lastInsertId();$account=query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();$account['access_token']=issueMobileToken($db,'attendee',$id);return $account;
+    $db->beginTransaction();try{query($db,'INSERT INTO natcon_accounts(name,email,country_code,phone,password_hash,referral_code,referred_by,status,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[$name,$email,$country,$phone,password_hash($password,PASSWORD_DEFAULT),$referral,$referrer?:null,'active',now()]);$id=(int)$db->lastInsertId();if($referrer)query($db,'INSERT INTO natcon_referrals(referrer_account_id,referred_account_id,referral_code,reward_kobo,status,created_at) VALUES(?,?,?,?,?,?)',[$referrer,$id,$referralCode,0,'pending',now()]);$db->commit();}
+    catch(\Throwable $e){if($db->inTransaction())$db->rollBack();if($e instanceof \PDOException&&in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('An account already uses that email or phone number.');throw $e;}
+    $account=query($db,'SELECT id,name,email,country_code,phone,profile_image,referral_code,wallet_balance_kobo FROM natcon_accounts WHERE id=?',[$id])->fetch();$account['access_token']=issueMobileToken($db,'attendee',$id);return $account;
+}
+function referralSummary(\PDO $db,int $accountId): array {
+    $account=query($db,'SELECT referral_code FROM natcon_accounts WHERE id=?',[$accountId])->fetch();if(!$account)throw new \InvalidArgumentException('Attendee account is unavailable.');
+    return ['code'=>$account['referral_code'],'signupcredit'=>'0.00','refercredit'=>'0.00','tracked'=>(int)query($db,'SELECT COUNT(*) FROM natcon_referrals WHERE referrer_account_id=?',[$accountId])->fetchColumn(),'converted'=>(int)query($db,"SELECT COUNT(*) FROM natcon_referrals WHERE referrer_account_id=? AND status='converted'",[$accountId])->fetchColumn()];
+}
+function markReferralConverted(\PDO $db,int $accountId): bool {
+    if($accountId<1)return false;
+    return query($db,"UPDATE natcon_referrals SET status='converted' WHERE referred_account_id=? AND status='pending'",[$accountId])->rowCount()>0;
 }
 function loginAccount(\PDO $db,array $in): array {
     $country=clean($in['country_code']??$in['ccode']??'',12);$phone=clean($in['phone']??$in['mobile']??'',40);$password=(string)($in['password']??'');
@@ -156,6 +166,20 @@ function toggleFavorite(\PDO $db,int $accountId,string $eventId): bool {
     $exists=query($db,'SELECT id FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();
     if($exists){query($db,'DELETE FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']]);return false;}
     query($db,'INSERT INTO natcon_favorites(account_id,event_id,created_at) VALUES(?,?,?)',[$accountId,$event['id'],now()]);return true;
+}
+function mobileReviews(\PDO $db,int $eventId): array {
+    return array_map(static fn($r)=>['user_img'=>$r['profile_image']??'','customername'=>$r['name'],'rate_number'=>(string)$r['rating'],'rate_text'=>$r['comment']??''],query($db,"SELECT r.rating,r.comment,a.name,a.profile_image FROM natcon_reviews r JOIN natcon_accounts a ON a.id=r.account_id WHERE r.event_id=? AND r.status='published' ORDER BY r.created_at DESC,r.id DESC LIMIT 100",[$eventId])->fetchAll());
+}
+function submitReview(\PDO $db,int $accountId,string $ticketToken,int $rating,string $comment): array {
+    if($rating<1||$rating>5)throw new \InvalidArgumentException('Choose a rating from 1 to 5 stars.');
+    $comment=clean($comment,2000);$event=primaryConference($db);
+    $ticket=query($db,"SELECT o.reference FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE d.ticket_token=? AND o.account_id=? AND o.event_id=? AND o.status='paid'",[$ticketToken,$accountId,$event['id']])->fetch();
+    if(!$ticket)throw new \InvalidArgumentException('Only an attendee with a paid NATCON ticket can review this event.');
+    $existing=query($db,'SELECT id FROM natcon_reviews WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();
+    if($existing){query($db,'UPDATE natcon_reviews SET order_reference=?,rating=?,comment=?,status=?,created_at=? WHERE id=?',[$ticket['reference'],$rating,$comment,'published',now(),$existing]);}
+    else query($db,'INSERT INTO natcon_reviews(account_id,event_id,order_reference,rating,comment,status,created_at) VALUES(?,?,?,?,?,?,?)',[$accountId,$event['id'],$ticket['reference'],$rating,$comment,'published',now()]);
+    audit($db,(string)$accountId,'event_review',$ticket['reference'],['event_id'=>(int)$event['id'],'rating'=>$rating]);
+    return ['submitted'=>true,'reviews'=>mobileReviews($db,(int)$event['id'])];
 }
 function favoriteEvents(\PDO $db,int $accountId): array {
     $event=primaryConference($db);$ids=query($db,'SELECT event_id FROM natcon_favorites WHERE account_id=?',[$accountId])->fetchAll();
@@ -252,7 +276,7 @@ function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
         foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,chapter,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['chapter']??'',150),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
         audit($db,$accountId?(string)$accountId:'public','registered',$ref,['delegates'=>count($delegates),'coupon_id'=>$coupon['id']??null,'discount_kobo'=>$discount,'wallet_kobo'=>$walletSpend,'consent'=>true,'privacy_version'=>'2026-09-28']);$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}
-    if($amount===0)queueTickets($db,$c,$ref);
+    if($amount===0){if($accountId)markReferralConverted($db,$accountId);queueTickets($db,$c,$ref);}
     return order($db,$ref,$token)+['payment_enabled'=>$amount>0&&$c['secret']!==''];
 }
 function releaseWalletReservation(\PDO $db,int $accountId,string $reference): bool {
@@ -295,7 +319,7 @@ function confirmPayment(\PDO $db,array $c,string $ref,array $payment,string $act
             catch(\PDOException $e){if(in_array((string)$e->getCode(),['23000','23505'],true))throw new \InvalidArgumentException('This bank transaction has already been reconciled.');throw $e;}
         }
         $changed=query($db,"UPDATE natcon_orders SET status='paid',paid_at=? WHERE reference=? AND status IN ('pending','awaiting_review')",[now(),$ref])->rowCount()>0;
-        if($changed){query($db,"UPDATE natcon_wallet_ledger SET status='paid' WHERE reference=? AND direction='debit' AND status='pending'",['SPEND-'.$ref]);queueTickets($db,$c,$ref);audit($db,$actor,'payment_confirmed',$ref,['amount_kobo'=>$o['amount_kobo'],'wallet_kobo'=>(int)($o['wallet_kobo']??0)]);}
+        if($changed){query($db,"UPDATE natcon_wallet_ledger SET status='paid' WHERE reference=? AND direction='debit' AND status='pending'",['SPEND-'.$ref]);if(!empty($o['account_id']))markReferralConverted($db,(int)$o['account_id']);queueTickets($db,$c,$ref);audit($db,$actor,'payment_confirmed',$ref,['amount_kobo'=>$o['amount_kobo'],'wallet_kobo'=>(int)($o['wallet_kobo']??0)]);}
         $db->commit();return $changed;
     }catch(\Throwable $e){$db->rollBack();throw $e;}
 }

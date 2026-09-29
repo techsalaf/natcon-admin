@@ -106,27 +106,25 @@ class MyBookingController extends GetxController implements GetxService {
 
   orderReviewApi({String? orderID}) async {
     try {
-      Map map = {
-        "uid": getData.read("UserLogin")["id"],
-        "ticket_id": orderID,
-        "total_star": tRate.toString(),
-        "review_comment": ratingText.text != "" ? ratingText.text : "",
-      };
-
-      print("!!!!!!!!!!!!!!!!" + map.toString());
-      Uri uri = Uri.parse(Config.baseurl + Config.orderReview);
+      final base = Config.imageUrl.replaceFirst(RegExp(r'/+$'), '');
+      final uri = Uri.parse('$base/api/mobile.php?client=user_api&endpoint=${Config.orderReview}');
       var response = await NatconHttp.post(
         uri,
-        body: jsonEncode(map),
+        body: jsonEncode({
+          'ticket_id': orderID,
+          'total_star': tRate,
+          'review_comment': ratingText.text.trim(),
+        }),
       );
-      print(response.body);
-      if (response.statusCode == 200) {
-        var result = jsonDecode(response.body);
+      final result = jsonDecode(response.body);
+      if (response.statusCode == 200 && result is Map && result['Result'] == 'true') {
         tRate = 1.0;
         ratingText.text = "";
         Get.back();
         ticketInformetionApi(ticketId: orderID);
-        showToastMessage(result["ResponseMsg"]);
+        showToastMessage(result['ResponseMsg']?.toString() ?? 'Your review was saved.');
+      } else {
+        showToastMessage(result is Map ? (result['ResponseMsg']?.toString() ?? 'Could not save your review.') : 'Could not save your review.');
       }
     } catch (e) {
       print(e.toString());

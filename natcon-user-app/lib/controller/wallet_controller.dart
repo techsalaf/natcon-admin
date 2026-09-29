@@ -28,6 +28,8 @@ class WalletController extends GetxController implements GetxService {
   String rCode = "";
   String signupcredit = "";
   String refercredit = "";
+  int referralCount = 0;
+  int convertedReferralCount = 0;
 
   Uri _natconUri(String action, [Map<String, String>? query]) {
     final base = Config.imageUrl.replaceFirst(RegExp(r'/+$'), '');
@@ -117,6 +119,8 @@ class WalletController extends GetxController implements GetxService {
         rCode = result["code"];
         signupcredit = result["signupcredit"];
         refercredit = result["refercredit"];
+        referralCount = (result['tracked'] as num?)?.toInt() ?? 0;
+        convertedReferralCount = (result['converted'] as num?)?.toInt() ?? 0;
       }
       isLoading = true;
       update();

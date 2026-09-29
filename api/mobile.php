@@ -30,6 +30,10 @@ try {
         $account=loginAccount($db,$in);
         mobileReply(['Result'=>'true','ResponseMsg'=>'Signed in successfully.','UserLogin'=>mobileAccountPayload($account),'AccessToken'=>$account['access_token']]);
     }
+    if($client==='user_api'&&$endpoint==='getdata.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Referral details loaded.']+\Natcon\referralSummary($db,(int)$account['id']));
+    }
     if($client==='user_api'&&$endpoint==='mobile_check.php'){
         limit($db,'mobile-account-check:'.($_SERVER['REMOTE_ADDR']??''),20);
         $country=clean($in['ccode']??'',12);$phone=clean($in['mobile']??'',40);
@@ -50,6 +54,12 @@ try {
     if($client==='user_api'&&$endpoint==='u_favlist.php'){
         $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Favorites loaded.','FavEventData'=>\Natcon\favoriteEvents($db,(int)$account['id'])]);
+    }
+    if($client==='user_api'&&$endpoint==='rate_update.php'){
+        $account=accountForToken($db);if(!$account)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        $rating=filter_var($in['total_star']??null,FILTER_VALIDATE_FLOAT);if($rating===false||$rating<1||$rating>5)mobileReply(['Result'=>'false','ResponseMsg'=>'Choose a rating from 1 to 5 stars.'],400);
+        $result=\Natcon\submitReview($db,(int)$account['id'],clean($in['ticket_id']??'',128),(int)round($rating),clean($in['review_comment']??'',2000));
+        mobileReply(['Result'=>'true','ResponseMsg'=>'Your review was saved.','reviewdata'=>$result['reviews']]);
     }
     if($client==='user_api'&&$endpoint==='u_couponlist.php'){
         if(!accountForToken($db))mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
@@ -78,7 +88,7 @@ try {
     if($client==='user_api'&&$endpoint==='u_event_data.php'){
         $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);
         $account=accountForToken($db);$detail=mobileEventDetails($db,$c,$account?(int)$account['id']:null);
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>[]]);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','EventData'=>$detail,'Event_gallery'=>[],'Event_Artist'=>[],'Event_Facility'=>[],'Event_Restriction'=>[],'reviewdata'=>\Natcon\mobileReviews($db,(int)$primary['id'])]);
     }
     if($client==='user_api'&&$endpoint==='u_event_type_price.php'){
         $eventId=clean($in['event_id']??'',64);$primary=\Natcon\primaryConference($db);if(!in_array($eventId,[(string)$primary['id'],'NATCON-2026','2026'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'NATCON event not found.'],404);

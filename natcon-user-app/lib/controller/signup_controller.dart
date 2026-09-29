@@ -132,7 +132,8 @@ class SignUpController extends GetxController implements GetxService {
         "email": email.text,
         "mobile": number.text,
         "ccode": cuntryCode,
-        "password": password.text
+        "password": password.text,
+        "refercode": referralCode.text.trim(),
       };
       Uri uri = Uri.parse(Config.baseurl + Config.registerUser);
       var response = await NatconHttp.post(
