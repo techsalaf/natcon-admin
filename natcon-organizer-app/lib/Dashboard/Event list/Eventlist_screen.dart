@@ -115,11 +115,14 @@ class _EventlistscreenState extends State<Eventlistscreen> {
                                               child: ClipRRect(
                                                 borderRadius:
                                                     BorderRadius.circular(15),
-                                                child: Image.network(
-                                                  "${AppUrl.imageurl}${listofeventController.listofeventinfo[index].eventImage}",
-                                                  height: 140,
-                                                  fit: BoxFit.cover,
-                                                ),
+                                                child: listofeventController.listofeventinfo[index].eventImage.isEmpty
+                                                    ? const ColoredBox(color: Color(0xFFEAF0F6), child: Center(child: Icon(Icons.event, color: Color(0xFF52677D))))
+                                                    : Image.network(
+                                                        "${AppUrl.imageurl}${listofeventController.listofeventinfo[index].eventImage}",
+                                                        height: 140,
+                                                        fit: BoxFit.cover,
+                                                        errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEAF0F6), child: Center(child: Icon(Icons.event, color: Color(0xFF52677D)))),
+                                                      ),
                                               ),
                                               decoration: BoxDecoration(
                                                 borderRadius:

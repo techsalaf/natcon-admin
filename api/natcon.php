@@ -12,7 +12,7 @@ try {
     $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db));
     $raw=file_get_contents('php://input');if(strlen($raw)>100000)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
-    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','account_session','account_profile','account_orders'];
+    $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
     elseif($action!=='webhook' && !in_array($action,$getActions,true) && $method!=='POST'){http_response_code(405);throw new InvalidArgumentException('Use POST for this action.');}
     elseif(in_array($action,$getActions,true)&&$method!=='GET'){http_response_code(405);throw new InvalidArgumentException('Use GET for this action.');}
@@ -66,6 +66,9 @@ try {
     if($action==='dashboard'){
         respond(['total_delegates'=>(int)query($db,'SELECT COUNT(*) FROM natcon_delegates')->fetchColumn(),'paid_delegates'=>(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON d.reference=o.reference WHERE o.status='paid'")->fetchColumn(),'checked_in'=>(int)query($db,'SELECT COUNT(DISTINCT delegate_id) FROM natcon_checkins')->fetchColumn(),'revenue_kobo'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn(),'pending_transfers'=>(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE status='awaiting_review'")->fetchColumn(),'chapters'=>query($db,'SELECT chapter,COUNT(*) AS total FROM natcon_delegates GROUP BY chapter ORDER BY total DESC')->fetchAll()]);
     }
+    if($action==='payouts'){requireStaff(['admin','finance']);respond(['items'=>\Natcon\payoutHistory($db,(int)$user['id'],$user['role']),'balance'=>\Natcon\payoutBalance($db)]);}
+    if($action==='request_payout'){$user=requireStaff(['admin']);respond(\Natcon\requestPayout($db,(int)$user['id'],\Natcon\payoutNairaToKobo($in['amount']??''),$in));}
+    if($action==='review_payout'){$user=requireStaff(['finance']);respond(\Natcon\reviewPayout($db,(int)$user['id'],(int)($in['payout_id']??0),clean($in['status']??'',20),clean($in['note']??'',1000)));}
     if($action==='delegates'||$action==='export'){
         $sql='SELECT d.*,o.status,o.amount_kobo,o.payer_name,o.payer_email,CASE WHEN EXISTS(SELECT 1 FROM natcon_checkins c WHERE c.delegate_id=d.id) THEN 1 ELSE 0 END AS checked_in FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE 1=1';$args=[];
         if(!empty($_GET['q'])){$sql.=' AND (d.name LIKE ? OR d.phone LIKE ? OR d.reference LIKE ? OR d.email LIKE ?)';$v='%'.clean($_GET['q']).'%';$args=[$v,$v,$v,$v];}

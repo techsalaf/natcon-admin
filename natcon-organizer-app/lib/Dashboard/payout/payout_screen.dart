@@ -4,6 +4,7 @@ import 'package:magicmate_organizer/Getx_controller.dart/Dashboard_controller.da
 import 'package:magicmate_organizer/Getx_controller.dart/payout_controller.dart';
 import 'package:magicmate_organizer/api_screens/Api_werper.dart';
 import 'package:magicmate_organizer/api_screens/confrigation.dart';
+import 'package:magicmate_organizer/api_screens/data_store.dart';
 import 'package:magicmate_organizer/utils/Colors.dart';
 import 'package:magicmate_organizer/utils/Custom_widget.dart';
 import 'package:magicmate_organizer/utils/Fontfamily.dart';
@@ -30,6 +31,8 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
   PayOutController payOutController = Get.find();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   String? selectType;
+  bool get isFinance => getData.read("AccountType") == "MANAGER";
+  bool get isAdmin => getData.read("AccountType") == "Orgnizer";
 
   @override
   void initState() {
@@ -207,6 +210,12 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
                                                             ? Colors.red
                                                             : Color(0xFF398B2B),
                                                       ),
+                                                      if (isFinance)
+                                                        detailsRow(
+                                                          detailsName: "Requested by",
+                                                          value: payOutController.payoutInfo?.payoutlist[index].requester ?? "",
+                                                          color: notifier.textColor,
+                                                        ),
                                                       detailsRow(
                                                         detailsName:
                                                             "Transaction Date".tr,
@@ -393,6 +402,30 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
                                                               ),
                                                             )
                                                           : SizedBox(),
+                                                      if (isFinance && ["pending", "approved"].contains(payOutController.payoutInfo?.payoutlist[index].status))
+                                                        Padding(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                                                          child: Wrap(
+                                                            spacing: 8,
+                                                            children: [
+                                                              if (payOutController.payoutInfo?.payoutlist[index].status == "pending") ...[
+                                                                OutlinedButton(
+                                                                  onPressed: () => _reviewPayout(index, "approved"),
+                                                                  child: const Text("Approve"),
+                                                                ),
+                                                                OutlinedButton(
+                                                                  onPressed: () => _reviewPayout(index, "rejected"),
+                                                                  child: const Text("Reject"),
+                                                                ),
+                                                              ],
+                                                              if (payOutController.payoutInfo?.payoutlist[index].status == "approved")
+                                                                ElevatedButton(
+                                                                  onPressed: () => _reviewPayout(index, "paid"),
+                                                                  child: const Text("Mark transfer paid"),
+                                                                ),
+                                                            ],
+                                                          ),
+                                                        ),
                                                       SizedBox(
                                                         height: 10,
                                                       ),
@@ -530,7 +563,7 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
                                 );
                         }),
                       ),
-                      GestButton(
+                      if (isAdmin) GestButton(
                         Width: Get.size.width,
                         height: 50,
                         // buttoncolor: appcolor,
@@ -559,6 +592,29 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _reviewPayout(int index, String status) async {
+    final payout = payOutController.payoutInfo!.payoutlist[index];
+    final noteController = TextEditingController();
+    final note = await Get.dialog<String>(AlertDialog(
+      title: Text(status == "paid" ? "Record manual transfer" : "${status.capitalizeFirst} payout"),
+      content: TextField(
+        controller: noteController,
+        minLines: 2,
+        maxLines: 4,
+        decoration: InputDecoration(
+          labelText: status == "paid" ? "Bank transfer reference and note" : "Review note",
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Get.back(), child: const Text("Cancel")),
+        TextButton(onPressed: () => Get.back(result: noteController.text.trim()), child: const Text("Submit")),
+      ],
+    ));
+    noteController.dispose();
+    if (note == null || note.isEmpty) return;
+    await payOutController.reviewPayout(payoutId: payout.payoutId, status: status, note: note);
   }
 
   Widget detailsRow({String? detailsName, value, Color? color}) {
@@ -640,6 +696,15 @@ class _MyPayoutScreenState extends State<MyPayoutScreen> {
                               color: notifier.textColor,
                               fontFamily: FontFamily.gilroyMedium,
                               fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            "Available from paid ticket sales: ₦${(payOutController.availableKobo / 100).toStringAsFixed(2)}",
+                            style: TextStyle(
+                              color: notifier.textColor,
+                              fontFamily: FontFamily.gilroyMedium,
+                              fontSize: 14,
                             ),
                           ),
                           SizedBox(

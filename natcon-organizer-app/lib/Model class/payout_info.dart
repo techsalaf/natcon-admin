@@ -41,6 +41,7 @@ class PayoutInfo {
 class Payoutlist {
   Payoutlist({
     required this.payoutId,
+    this.requester,
     required this.amt,
     required this.status,
     this.proof,
@@ -55,6 +56,7 @@ class Payoutlist {
   });
 
   String payoutId;
+  String? requester;
   String amt;
   String status;
   dynamic proof;
@@ -69,6 +71,7 @@ class Payoutlist {
 
   factory Payoutlist.fromJson(Map<String, dynamic> json) => Payoutlist(
         payoutId: json["payout_id"],
+        requester: json["requester"],
         amt: json["amt"],
         status: json["status"],
         proof: json["proof"],
@@ -84,6 +87,7 @@ class Payoutlist {
 
   Map<String, dynamic> toJson() => {
         "payout_id": payoutId,
+        "requester": requester,
         "amt": amt,
         "status": status,
         "proof": proof,

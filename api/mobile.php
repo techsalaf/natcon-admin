@@ -117,7 +117,31 @@ try {
         ];
         $labels=['Total Delegates'=>$totals['delegates'],'Paid Delegates'=>$totals['paid'],'Checked In'=>$totals['checked_in'],'Earning'=>number_format($totals['revenue']/100,2),'Pending Transfers'=>$totals['pending_transfers']];
         $report=[];foreach($labels as $title=>$value)$report[]=['title'=>$title,'report_data'=>(string)$value,'url'=>''];
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Dashboard loaded.','report_data'=>$report,'withdraw_limit'=>'0','natcon_data'=>$totals]);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Dashboard loaded.','report_data'=>$report,'withdraw_limit'=>'1','natcon_data'=>$totals]);
+    }
+    if($client==='orag_api'&&$endpoint==='payout_list.php'){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if(!in_array($staff['role'],['admin','finance'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view payout records.'],403);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout history loaded.','Payoutlist'=>\Natcon\payoutHistory($db,(int)$staff['id'],$staff['role']),'balance'=>\Natcon\payoutBalance($db)]);
+    }
+    if($client==='orag_api'&&$endpoint==='request_withdraw.php'){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can submit payout requests.'],403);
+        $amount=\Natcon\payoutNairaToKobo($in['amt']??'');$result=\Natcon\requestPayout($db,(int)$staff['id'],$amount,$in);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout request submitted for Finance review.','data'=>$result]);
+    }
+    if($client==='orag_api'&&$endpoint==='payout_review.php'){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if($staff['role']!=='finance')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Finance can review payout requests.'],403);
+        $result=\Natcon\reviewPayout($db,(int)$staff['id'],(int)($in['payout_id']??0),clean($in['status']??'',20),clean($in['note']??'',1000));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout request updated.','data'=>$result]);
+    }
+    if($client==='orag_api'&&in_array($endpoint,['list_event.php','event_status_wise.php'],true)){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view event records.'],403);
+        $events=\Natcon\organizerEvents($db);
+        if($endpoint==='event_status_wise.php'){$filter=strtolower(clean($in['status']??'',20));$events=array_values(array_filter($events,static fn($e)=>match($filter){'today','active'=>strtolower($e['event_progress'])==='today','past','completed'=>strtolower($e['event_progress'])==='past','upcoming'=>strtolower($e['event_progress'])==='upcoming',default=>false}));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Events loaded.','order_data'=>array_map(static fn($e)=>['event_id'=>$e['event_id'],'event_title'=>$e['event_title'],'event_img'=>$e['event_image'],'event_sdate'=>$e['event_start_date'],'event_place_name'=>$e['event_place_name']],$events)]);}
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Events loaded.','Eventdata'=>$events]);
+    }
+    if($client==='orag_api'&&$endpoint==='event_information.php'){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
+        if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view event records.'],403);
+        $detail=\Natcon\organizerEventDetails($db,clean($in['event_id']??'',32));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event details loaded.','Eventdata'=>$detail]);
     }
     if($client==='orag_api'&&in_array($endpoint,['qr_ticket_verify.php','id_ticket_verify.php'],true)){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);

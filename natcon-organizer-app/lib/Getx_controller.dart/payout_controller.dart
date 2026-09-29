@@ -40,6 +40,7 @@ class PayOutController extends GetxController implements GetxService {
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
         payoutInfo = PayoutInfo.fromJson(result);
+        availableKobo = (result['balance']?['available_kobo'] as num?)?.toInt() ?? 0;
       }
       isLoading = true;
       update();
@@ -60,6 +61,7 @@ class PayOutController extends GetxController implements GetxService {
   }
 
   bool getWithdrawLoad = false;
+  int availableKobo = 0;
   requestWithdraweApi({String? rType}) async {
     getWithdrawLoad = true;
     update();
@@ -75,7 +77,6 @@ class PayOutController extends GetxController implements GetxService {
         "upi_id": upi.text,
         "paypal_id": emailId.text,
       };
-      print(map.toString());
       Uri uri = Uri.parse(AppUrl.baseUrl + AppUrl.requestwithdraw);
       var response = await NatconHttp.post(
         uri,
@@ -83,7 +84,6 @@ class PayOutController extends GetxController implements GetxService {
       );
       if (response.statusCode == 200) {
         var result = jsonDecode(response.body);
-        print(result.toString());
         if (result["Result"] == "true") {
           getWithdrawLoad = false;
           update();
@@ -104,5 +104,25 @@ class PayOutController extends GetxController implements GetxService {
       update();
       print(e.toString());
     }
+  }
+
+  Future<bool> reviewPayout({required String payoutId, required String status, required String note}) async {
+    try {
+      final response = await NatconHttp.post(
+        Uri.parse('${AppUrl.baseUrl}payout_review.php'),
+        headers: ApiWrapper.headers,
+        body: jsonEncode({'payout_id': payoutId, 'status': status, 'note': note}),
+      );
+      final result = jsonDecode(response.body);
+      if (response.statusCode == 200 && result is Map && result['Result'] == 'true') {
+        ApiWrapper.showToastMessage(result['ResponseMsg']);
+        await getPayOutList();
+        return true;
+      }
+      ApiWrapper.showToastMessage(result is Map ? (result['ResponseMsg'] ?? 'Payout review failed.') : 'Payout review failed.');
+    } catch (e) {
+      print(e.toString());
+    }
+    return false;
   }
 }

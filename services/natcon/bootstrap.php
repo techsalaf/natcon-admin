@@ -73,6 +73,7 @@ function migrate(\PDO $db): void {
         if(!in_array($column,$columns,true)) $db->exec("ALTER TABLE natcon_delegates ADD COLUMN $column $type");
     $insert=$db->getAttribute(\PDO::ATTR_DRIVER_NAME)==='sqlite'?'INSERT OR IGNORE':'INSERT IGNORE';
     $db->exec("$insert INTO natcon_locks(name,value) VALUES('registration',0)");
+    $db->exec("$insert INTO natcon_locks(name,value) VALUES('payout',0)");
     seedPrimaryConference($db,config());
 }
 function now(): string { return gmdate('Y-m-d H:i:s'); }
@@ -107,6 +108,38 @@ function referralSummary(\PDO $db,int $accountId): array {
 function markReferralConverted(\PDO $db,int $accountId): bool {
     if($accountId<1)return false;
     return query($db,"UPDATE natcon_referrals SET status='converted' WHERE referred_account_id=? AND status='pending'",[$accountId])->rowCount()>0;
+}
+function payoutBalance(\PDO $db): array {
+    $revenue=(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE status='paid'")->fetchColumn();
+    $reserved=(int)query($db,"SELECT COALESCE(SUM(amount_kobo),0) FROM natcon_payouts WHERE status IN ('pending','approved','paid')")->fetchColumn();
+    return ['revenue_kobo'=>$revenue,'reserved_kobo'=>$reserved,'available_kobo'=>max(0,$revenue-$reserved)];
+}
+function payoutNairaToKobo(mixed $amount): int {
+    if(!is_scalar($amount)||!preg_match('/^(?:0|[1-9]\d{0,8})(?:\.\d{1,2})?$/',trim((string)$amount)))throw new \InvalidArgumentException('Enter a valid payout amount with up to two decimal places.');
+    [$whole,$fraction]=array_pad(explode('.',(string)$amount,2),2,'');return ((int)$whole*100)+(int)str_pad($fraction,2,'0');
+}
+function requestPayout(\PDO $db,int $staffId,int $amountKobo,array $details): array {
+    $type=clean($details['r_type']??'',32);if(!in_array($type,['BANK Transfer','UPI','Paypal'],true))throw new \InvalidArgumentException('Choose a supported payout destination.');
+    if($amountKobo<100)throw new \InvalidArgumentException('The minimum payout request is ₦1.00.');
+    $bank=clean($details['bank_name']??'',120);$name=clean($details['acc_name']??'',150);$account=clean($details['acc_number']??'',40);$ifsc=clean($details['ifsc_code']??'',24);$upi=clean($details['upi_id']??'',190);$paypal=strtolower(clean($details['paypal_id']??'',190));
+    if($type==='BANK Transfer'&&(!$bank||!$name||!preg_match('/^[0-9]{8,40}$/',$account)))throw new \InvalidArgumentException('Provide a bank name, account holder, and valid account number.');
+    if($type==='UPI'&&!preg_match('/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,80}$/',$upi))throw new \InvalidArgumentException('Provide a valid UPI ID.');
+    if($type==='Paypal'&&!filter_var($paypal,FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Provide a valid PayPal email.');
+    $note=json_encode(['method'=>$type,'request_note'=>clean($details['note']??'',1000),'ifsc_code'=>$ifsc,'upi_id'=>$upi,'paypal_id'=>$paypal],JSON_UNESCAPED_SLASHES);
+    $db->beginTransaction();try{
+        query($db,"UPDATE natcon_locks SET value=value+1 WHERE name='payout'");$available=payoutBalance($db)['available_kobo'];if($amountKobo>$available)throw new \InvalidArgumentException('Payout amount exceeds available paid ticket revenue.');
+        query($db,'INSERT INTO natcon_payouts(staff_id,amount_kobo,bank_name,account_name,account_number,note,status,created_at) VALUES(?,?,?,?,?,?,?,?)',[$staffId,$amountKobo,$bank,$name,$account,$note,'pending',now()]);$id=(int)$db->lastInsertId();audit($db,(string)$staffId,'payout_requested',(string)$id,['amount_kobo'=>$amountKobo,'method'=>$type]);$db->commit();return ['payout_id'=>$id,'status'=>'pending','amount_kobo'=>$amountKobo,'available_kobo'=>$available-$amountKobo];
+    }catch(\Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+}
+function payoutHistory(\PDO $db,int $staffId,string $role): array {
+    if(!in_array($role,['admin','finance'],true))throw new \InvalidArgumentException('Your role cannot view payout records.');
+    $rows=$role==='finance'?query($db,'SELECT p.*,s.name AS requester FROM natcon_payouts p JOIN natcon_staff s ON s.id=p.staff_id ORDER BY p.id DESC LIMIT 500')->fetchAll():query($db,'SELECT p.*,s.name AS requester FROM natcon_payouts p JOIN natcon_staff s ON s.id=p.staff_id WHERE p.staff_id=? ORDER BY p.id DESC LIMIT 500',[$staffId])->fetchAll();
+    return array_map(static function($r){$extra=json_decode((string)$r['note'],true);$extra=is_array($extra)?$extra:[];return ['payout_id'=>(string)$r['id'],'staff_id'=>(string)$r['staff_id'],'requester'=>$r['requester'],'amt'=>number_format((int)$r['amount_kobo']/100,2,'.',''),'amount_kobo'=>(int)$r['amount_kobo'],'status'=>$r['status'],'proof'=>'','r_date'=>$r['created_at'],'r_type'=>$extra['method']??'BANK Transfer','acc_number'=>$r['account_number'],'bank_name'=>$r['bank_name'],'acc_name'=>$r['account_name'],'ifsc_code'=>$extra['ifsc_code']??'','upi_id'=>$extra['upi_id']??'','paypal_id'=>$extra['paypal_id']??'','note'=>$extra['request_note']??'','reviewed_by'=>$r['reviewed_by'],'reviewed_at'=>$r['reviewed_at']];},$rows);
+}
+function reviewPayout(\PDO $db,int $financeId,int $payoutId,string $status,string $note): array {
+    $note=clean($note,1000);if(!in_array($status,['approved','rejected','paid'],true))throw new \InvalidArgumentException('Choose approved, rejected, or paid.');
+    if(($status==='paid'&&strlen($note)<8)||($status!=='paid'&&strlen($note)<4))throw new \InvalidArgumentException('Enter a review note; paid requests also need the bank transfer reference.');
+    $db->beginTransaction();try{$p=query($db,'SELECT status,amount_kobo,staff_id FROM natcon_payouts WHERE id=?',[$payoutId])->fetch();if(!$p)throw new \InvalidArgumentException('Payout request not found.');$valid=($status==='paid'&&$p['status']==='approved')||(($status==='approved'||$status==='rejected')&&$p['status']==='pending');if(!$valid)throw new \InvalidArgumentException('This payout request has already been reviewed or cannot take that transition.');$updated=query($db,'UPDATE natcon_payouts SET status=?,reviewed_by=?,reviewed_at=? WHERE id=? AND status=?',[$status,$financeId,now(),$payoutId,$p['status']]);if($updated->rowCount()!==1)throw new \InvalidArgumentException('This payout request was updated by another Finance user. Refresh and try again.');audit($db,(string)$financeId,'payout_'.$status,(string)$payoutId,['requester_id'=>(int)$p['staff_id'],'amount_kobo'=>(int)$p['amount_kobo'],'note'=>$note]);$db->commit();return ['payout_id'=>$payoutId,'status'=>$status];}catch(\Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
 }
 function loginAccount(\PDO $db,array $in): array {
     $country=clean($in['country_code']??$in['ccode']??'',12);$phone=clean($in['phone']??$in['mobile']??'',40);$password=(string)($in['password']??'');
@@ -152,6 +185,19 @@ function activeTicketType(\PDO $db,int $eventId): array {
     return $row;
 }
 function mobileEventCard(\PDO $db,array $c): array {$event=primaryConference($db);return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_sdate'=>substr((string)$event['starts_at'],0,10),'event_place_name'=>$event['venue']];}
+function organizerEventRow(\PDO $db,array $event): array {
+    $type=query($db,"SELECT id,label,price_kobo,capacity FROM natcon_ticket_types WHERE event_id=? AND status='active' ORDER BY price_kobo,id LIMIT 1",[$event['id']])->fetch();
+    $paid=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.event_id=? AND o.status='paid'",[$event['id']])->fetchColumn();
+    $start=(string)($event['starts_at']??'');$end=(string)($event['ends_at']??'');$today=(new \DateTimeImmutable('now',new \DateTimeZone('Africa/Lagos')))->format('Y-m-d');$progress=$today<substr($start,0,10)?'Upcoming':($today>substr($end,0,10)?'Past':'Today');
+    return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_cat_id'=>(string)($event['category_id']??''),'event_cat_name'=>'NATCON','event_cover_img'=>'','event_image'=>'','event_status'=>$event['status'],'event_start_date'=>substr($start,0,10),'event_start_time'=>substr($start,11,8),'event_end_time'=>substr($end,11,8),'event_address'=>$event['venue']??'','event_description'=>$event['description']??'','event_disclaimer'=>'','event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','event_progress'=>$progress,'event_place_name'=>$event['venue']??'','event_facility_id'=>'','event_restict_id'=>null,'event_tags'=>'NATCON','event_vurls'=>'','type_id'=>(string)($type['id']??''),'event_type_list'=>$type['label']??'','ticket_price'=>number_format((int)($type['price_kobo']??0)/100,2,'.',''),'total_ticket'=>(int)($type['capacity']??0),'total_book_ticket'=>$paid];
+}
+function organizerEvents(\PDO $db): array {
+    return array_map(static fn($event)=>organizerEventRow($db,$event),query($db,'SELECT * FROM natcon_events ORDER BY starts_at DESC,id DESC')->fetchAll());
+}
+function organizerEventDetails(\PDO $db,string $eventId): array {
+    $event=query($db,'SELECT * FROM natcon_events WHERE id=?',[clean($eventId,32)])->fetch();if(!$event)throw new \InvalidArgumentException('NATCON event not found.');$row=organizerEventRow($db,$event);
+    return ['event_id'=>$row['event_id'],'event_title'=>$row['event_title'],'event_cover_img'=>'','event_image'=>'','event_status'=>$row['event_status'],'event_start_date'=>$row['event_start_date'],'event_start_time'=>$row['event_start_time'],'event_end_time'=>$row['event_end_time'],'event_address'=>$row['event_address'],'event_description'=>$row['event_description'],'event_disclaimer'=>$row['event_disclaimer'],'event_latitude'=>$row['event_latitude'],'event_longtitude'=>$row['event_longtitude'],'event_progress'=>$row['event_progress'],'event_place_name'=>$row['event_place_name'],'event_type_list'=>$row['event_type_list'],'event_revnue'=>(int)query($db,"SELECT COALESCE(SUM(amount_kobo+wallet_kobo),0) FROM natcon_orders WHERE event_id=? AND status='paid'",[$event['id']])->fetchColumn(),'ticket_price'=>$row['ticket_price'],'event_tags'=>$row['event_tags'],'event_vurls'=>'','total_ticket'=>$row['total_ticket'],'total_book_ticket'=>$row['total_book_ticket'],'gallerydata'=>[],'artistdata'=>[],'facilitydata'=>[],'restrictiondata'=>[],'joined_user'=>[],'attend_user'=>[],'notjoined_user'=>[],'total_review'=>[]];
+}
 function mobileEventDetails(\PDO $db,array $c,?int $accountId=null): array {
     $event=primaryConference($db);$type=activeTicketType($db,(int)$event['id']);$paid=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.status='paid' AND o.event_id=?",[$event['id']])->fetchColumn();$cap=(int)$type['capacity'];$favorite=0;
     if($accountId)$favorite=(int)query($db,'SELECT COUNT(*) FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();

@@ -123,11 +123,14 @@ class _TodayeventscreenState extends State<Todayeventscreen> {
                                   width: 100,
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(15),
-                                    child: Image.network(
-                                      "${AppUrl.imageurl}${statuswiseeventController.todayeventinfo?.orderData[index].eventImg}",
-                                      height: 140,
-                                      fit: BoxFit.cover,
-                                    ),
+                                    child: (statuswiseeventController.todayeventinfo?.orderData[index].eventImg ?? '').isEmpty
+                                        ? const ColoredBox(color: Color(0xFFEAF0F6), child: Center(child: Icon(Icons.event, color: Color(0xFF52677D))))
+                                        : Image.network(
+                                            "${AppUrl.imageurl}${statuswiseeventController.todayeventinfo!.orderData[index].eventImg}",
+                                            height: 140,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFEAF0F6), child: Center(child: Icon(Icons.event, color: Color(0xFF52677D)))),
+                                          ),
                                   ),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(15),
