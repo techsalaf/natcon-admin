@@ -164,9 +164,12 @@ function mobileTicketInfo(\PDO $db,int $accountId,string $token,array $c): array
     $event=primaryConference($db);return ['ticket_id'=>$ticket['ticket_token'],'ticket_title'=>$event['title'],'start_time'=>substr((string)$event['starts_at'],0,10),'event_address'=>$event['venue'],'event_address_title'=>$event['venue'],'event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_title'=>'The Achiever Ambassadors Islamic Foundation','qrcode'=>$ticket['ticket_token'],'unique_code'=>$ticket['reference'],'ticket_username'=>$ticket['name'],'ticket_mobile'=>$ticket['whatsapp']?:$ticket['phone'],'ticket_email'=>$ticket['email'],'ticket_rate'=>'0','ticket_type'=>'Delegate','total_ticket'=>'1','ticket_subtotal'=>$amount,'ticket_cou_amt'=>'0','ticket_wall_amt'=>'0','ticket_tax'=>'0','ticket_total_amt'=>$amount,'ticket_p_method'=>$ticket['bank_reference']?'Bank Transfer':'Paystack','ticket_transaction_id'=>$ticket['bank_reference']?:$ticket['reference'],'ticket_status'=>'paid'];
 }
 function seedPrimaryConference(\PDO $db,array $c): int {
+    $category=query($db,"SELECT id FROM natcon_categories WHERE title='NATCON' ORDER BY id LIMIT 1")->fetchColumn();
+    if(!$category){query($db,'INSERT INTO natcon_categories(title,image_url,status,sort_order) VALUES(?,?,?,?)',['NATCON',null,'active',0]);$category=(int)$db->lastInsertId();}
     $event=query($db,"SELECT id FROM natcon_events WHERE slug='natcon-2026'")->fetch();
-    if(!$event){query($db,'INSERT INTO natcon_events(owner_staff_id,category_id,title,slug,description,venue,starts_at,ends_at,currency,status,created_at) VALUES(NULL,NULL,?,?,?,?,?,?,?,?,?)',[$c['name'],'natcon-2026',$c['theme'],$c['venue'],$c['start_date'].' 00:00:00',$c['end_date'].' 23:59:59','NGN','published',now()]);$id=(int)$db->lastInsertId();}
+    if(!$event){query($db,'INSERT INTO natcon_events(owner_staff_id,category_id,title,slug,description,venue,starts_at,ends_at,currency,status,created_at) VALUES(NULL,?,?,?,?,?,?,?,?,?,?)',[$category,$c['name'],'natcon-2026',$c['theme'],$c['venue'],$c['start_date'].' 00:00:00',$c['end_date'].' 23:59:59','NGN','published',now()]);$id=(int)$db->lastInsertId();}
     else $id=(int)$event['id'];
+    query($db,'UPDATE natcon_events SET category_id=? WHERE id=? AND category_id IS NULL',[$category,$id]);
     $earlyEnd=$c['earlybird_end'].' 23:59:59';$standardStart=gmdate('Y-m-d H:i:s',strtotime($earlyEnd.' UTC')+1);
     foreach([['NATCON Early Bird',700000,null,$earlyEnd],['NATCON Delegate',800000,$standardStart,null]] as [$label,$price,$start,$end]){
         $exists=query($db,'SELECT id FROM natcon_ticket_types WHERE event_id=? AND label=?',[$id,$label])->fetchColumn();
@@ -185,6 +188,19 @@ function activeTicketType(\PDO $db,int $eventId): array {
     return $row;
 }
 function mobileEventCard(\PDO $db,array $c): array {$event=primaryConference($db);return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>'','event_sdate'=>substr((string)$event['starts_at'],0,10),'event_place_name'=>$event['venue']];}
+function mobileEventCategories(\PDO $db): array {
+    $rows=query($db,"SELECT c.id,c.title,c.image_url,COUNT(e.id) AS total_event FROM natcon_categories c JOIN natcon_events e ON e.category_id=c.id AND e.status='published' WHERE c.status='active' GROUP BY c.id,c.title,c.image_url ORDER BY c.sort_order,c.title")->fetchAll();
+    return array_map(static fn($row)=>['id'=>(string)$row['id'],'title'=>$row['title'],'cat_img'=>$row['image_url']??'','cover_img'=>'','total_event'=>(int)$row['total_event']],$rows);
+}
+function mobileEventSearch(\PDO $db,string $keyword=''): array {
+    $keyword=clean($keyword,100);$rows=$keyword===''?query($db,"SELECT e.id,e.title,e.starts_at,e.venue FROM natcon_events e WHERE e.status='published' ORDER BY e.starts_at DESC,e.id DESC LIMIT 100")->fetchAll():query($db,"SELECT DISTINCT e.id,e.title,e.starts_at,e.venue FROM natcon_events e LEFT JOIN natcon_categories c ON c.id=e.category_id WHERE e.status='published' AND (e.title LIKE ? OR e.description LIKE ? OR e.venue LIKE ? OR c.title LIKE ?) ORDER BY e.starts_at DESC,e.id DESC LIMIT 100",array_fill(0,4,'%'.$keyword.'%'))->fetchAll();
+    return array_map(static fn($row)=>['event_id'=>(string)$row['id'],'event_title'=>$row['title'],'event_img'=>'','event_sdate'=>substr((string)$row['starts_at'],0,10),'event_place_name'=>$row['venue']??''],$rows);
+}
+function mobileEventsByCategory(\PDO $db,string $categoryId): array {
+    if(!preg_match('/^[1-9]\d{0,8}$/',$categoryId))throw new \InvalidArgumentException('Choose a valid event category.');
+    $rows=query($db,"SELECT e.id,e.title,e.starts_at,e.venue FROM natcon_events e JOIN natcon_categories c ON c.id=e.category_id WHERE e.status='published' AND c.status='active' AND c.id=? ORDER BY e.starts_at DESC,e.id DESC LIMIT 100",[(int)$categoryId])->fetchAll();
+    return array_map(static fn($row)=>['event_id'=>(string)$row['id'],'event_title'=>$row['title'],'event_img'=>'','event_sdate'=>substr((string)$row['starts_at'],0,10),'event_place_name'=>$row['venue']??''],$rows);
+}
 function organizerEventRow(\PDO $db,array $event): array {
     $type=query($db,"SELECT id,label,price_kobo,capacity FROM natcon_ticket_types WHERE event_id=? AND status='active' ORDER BY price_kobo,id LIMIT 1",[$event['id']])->fetch();
     $paid=(int)query($db,"SELECT COUNT(*) FROM natcon_delegates d JOIN natcon_orders o ON o.reference=d.reference WHERE o.event_id=? AND o.status='paid'",[$event['id']])->fetchColumn();

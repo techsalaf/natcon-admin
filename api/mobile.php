@@ -43,7 +43,14 @@ try {
     if($client==='user_api'&&$endpoint==='u_home_data.php'){
         $account=accountForToken($db);$canonical=\Natcon\event($c,$db);$card=mobileEventCard($db,$c);$today=(new DateTimeImmutable('now',new DateTimeZone('Africa/Lagos')))->format('Y-m-d');$open=$today<=$canonical['end_date'];
         $wallet=$account?(int)$account['wallet_balance_kobo']/100:0;
-        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>[],'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>[],'wallet'=>(string)$wallet,'upcoming_event'=>$open?[$card]:[],'nearby_event'=>[],'this_month_event'=>$open?[$card]:[]]]);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'NATCON events loaded.','HomeData'=>['Catlist'=>\Natcon\mobileEventCategories($db),'Main_Data'=>['id'=>'NATCON','currency'=>'₦','scredit'=>'0','rcredit'=>'0','tax'=>'0'],'latest_event'=>$open?[$card]:[],'wallet'=>(string)$wallet,'upcoming_event'=>$open?[$card]:[],'nearby_event'=>[],'this_month_event'=>$open?[$card]:[]]]);
+    }
+    if($client==='user_api'&&$endpoint==='u_cat_event.php'){
+        $categoryId=clean($in['cat_id']??'',32);
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Category events loaded.','CatEventData'=>\Natcon\mobileEventsByCategory($db,$categoryId)]);
+    }
+    if($client==='user_api'&&$endpoint==='u_search_event.php'){
+        mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Search results loaded.','SearchData'=>\Natcon\mobileEventSearch($db,clean($in['keyword']??'',100))]);
     }
     if($client==='user_api'&&$endpoint==='u_pagelist.php')mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Pages loaded.','pagelist'=>\Natcon\mobilePages($db)]);
     if($client==='user_api'&&$endpoint==='u_faq.php')mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'FAQs loaded.','FaqData'=>\Natcon\mobileFaqs($db)]);
