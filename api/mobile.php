@@ -156,7 +156,7 @@ try {
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);if($staff['role']!=='finance')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Finance can review payout requests.'],403);
         $result=\Natcon\reviewPayout($db,(int)$staff['id'],(int)($in['payout_id']??0),clean($in['status']??'',20),clean($in['note']??'',1000));mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Payout request updated.','data'=>$result]);
     }
-    if($client==='orag_api'&&in_array($endpoint,['list_category.php','list_type.php','add_event.php','edit_event.php','add_type.php','edit_type.php'],true)){
+    if($client==='orag_api'&&in_array($endpoint,['list_category.php','list_type.php','add_event.php','edit_event.php','add_type.php','edit_type.php','complete_event.php','cancle_event.php'],true)){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);
         if($endpoint==='list_category.php'){
             if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view event categories.'],403);
@@ -167,6 +167,7 @@ try {
             mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Ticket types loaded.','TypePricedata'=>\Natcon\organizerTicketTypes($db,clean($in['event_id']??'',32))]);
         }
         if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can manage NATCON events and ticket types.'],403);
+        if(in_array($endpoint,['complete_event.php','cancle_event.php'],true)){$action=$endpoint==='complete_event.php'?'complete':'cancel';$saved=\Natcon\setOrganizerEventStatus($db,clean($in['event_id']??'',32),$action,(int)$staff['id']);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>$action==='cancel'?'Event marked cancelled. Paid orders remain for staff-managed refunds.':'Event marked completed.','Eventdata'=>$saved]);}
         $in['_staff_id']=(int)$staff['id'];
         if(in_array($endpoint,['add_event.php','edit_event.php'],true)){
             $id=$endpoint==='edit_event.php'?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;

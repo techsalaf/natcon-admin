@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
-use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,organizerEvents,organizerCategories,organizerTicketTypes,saveOrganizerEvent,saveOrganizerTicketType};
+use function Natcon\{config,database,query,clean,event,order,register,gateway,confirmPayment,queueTickets,recover,delegate,checkin,audit,now,limit,createAccount,loginAccount,accountForToken,staffForToken,issueMobileToken,updateAccountProfile,organizerEvents,organizerCategories,organizerTicketTypes,saveOrganizerEvent,saveOrganizerTicketType,setOrganizerEventStatus};
 header('X-Content-Type-Options: nosniff');header('Cache-Control: no-store');header('Content-Type: application/json; charset=utf-8');
 ini_set('session.use_strict_mode', '1');
 session_name('natcon_staff');session_set_cookie_params(['httponly'=>true,'secure'=>!empty($_SERVER['HTTPS'])&&$_SERVER['HTTPS']!=='off','samesite'=>'Strict','path'=>'/']);session_start();
@@ -75,6 +75,7 @@ try {
         if(!empty($in['event_id'])&&!$id)throw new InvalidArgumentException('Choose a valid NATCON event.');
         respond(saveOrganizerEvent($db,$in,$id?:null));
     }
+    if($action==='event_status'){$user=requireStaff(['admin']);$id=clean($in['event_id']??'',32);$statusAction=clean($in['status_action']??'',20);respond(setOrganizerEventStatus($db,$id,$statusAction,(int)$user['id']));}
     if($action==='save_ticket_type'){
         $user=requireStaff(['admin']);$in['_staff_id']=(int)$user['id'];$id=filter_var($in['ticket_type_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
         if(!empty($in['ticket_type_id'])&&!$id)throw new InvalidArgumentException('Choose a valid ticket type.');

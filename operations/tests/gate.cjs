@@ -25,6 +25,7 @@ const cases = {
   'only Admin can request and only Finance can review payouts': html.includes('id="payout-request-form"') && html.includes('data-admin') && js.includes("user.role === 'finance'") && js.includes("api.request('request_payout'") && js.includes("api.request('review_payout'"),
   'recording a payout as paid asks for manual transfer reference': js.includes("status === 'paid' ? 'Bank transfer reference") && js.includes('payoutReviewStatus === \'paid\' ? 8 : 4'),
   'event and ticket editors are visible only to Admin': html.includes('data-view="events" class="nav-item" data-admin hidden') && js.includes("view === 'events' && user?.role !== 'admin'"),
+  'event status actions use the Admin-protected shared service and warn about manual refunds': js.includes("api.request('event_status'") && api.includes("action==='event_status'") && api.includes('setOrganizerEventStatus($db') && js.includes('Paid orders stay recorded and refunds must be handled by staff.'),
   'web event and ticket editors call Admin-protected shared-catalogue actions': api.includes("$action==='event_catalogue'") && api.includes("$action==='save_event'") && api.includes("$action==='save_ticket_type'") && js.includes("api.request('save_event'") && js.includes("api.request('save_ticket_type'"),
   'event editor exposes shared attendee catalogue fields and visibility': ['event-category','event-date','event-start','event-end','event-status','event-disclaimer','event-tags','event-videos'].every(id=>html.includes(`id="${id}"`)) && api.includes('saveOrganizerEvent($db,$in'),
 };

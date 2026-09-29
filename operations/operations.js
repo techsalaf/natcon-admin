@@ -68,7 +68,12 @@
     catalogue.events.forEach((event) => {
       const card = node('article', undefined, 'transfer-card'), info = node('div'), actions = node('div', undefined, 'transfer-right');
       info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} · ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} · ${event.total_book_ticket || 0} paid delegates`));
-      const edit = node('button', 'Edit event', 'secondary'); edit.addEventListener('click', () => openEventEditor(event)); actions.append(edit); card.append(info, actions); $('event-list').append(card);
+      const edit = node('button', 'Edit event', 'secondary'); edit.addEventListener('click', () => openEventEditor(event)); actions.append(edit);
+      if (!['cancelled','completed','archived'].includes(event.event_status)) {
+        const complete = node('button', 'Mark completed', 'secondary'); complete.addEventListener('click', () => updateEventStatus(event, 'complete')); actions.append(complete);
+        const cancel = node('button', 'Cancel event', 'secondary'); cancel.addEventListener('click', () => updateEventStatus(event, 'cancel')); actions.append(cancel);
+      }
+      card.append(info, actions); $('event-list').append(card);
     });
     $('event-category').replaceChildren(); $('ticket-event').replaceChildren();
     catalogue.categories.forEach((category) => { const option = new Option(category.title, category.id); $('event-category').add(option); });
@@ -78,6 +83,13 @@
       const row = document.createElement('tr'); row.append(detailCell(ticket.type, ticket.description), detailCell(ticket.event_title), detailCell(C.money(Math.round(Number(ticket.price) * 100))), detailCell(ticket.tlimit === '0' ? 'Unlimited' : ticket.tlimit), detailCell(ticket.status === '1' ? 'Active' : 'Inactive'));
       const actionCell = node('td'), edit = node('button', 'Edit', 'text-button'); edit.addEventListener('click', () => openTicketEditor(ticket)); actionCell.append(edit); row.append(actionCell); $('ticket-type-rows').append(row);
     });
+  }
+  async function updateEventStatus(event, statusAction) {
+    const verb=statusAction==='cancel'?'cancel':'mark completed';
+    const consequence=statusAction==='cancel'?' Paid orders stay recorded and refunds must be handled by staff.':'';
+    if (!window.confirm(`${verb[0].toUpperCase()+verb.slice(1)} “${event.event_title}”?${consequence}`)) return;
+    try { await api.request('event_status',{event_id:event.event_id,status_action:statusAction}); notify(statusAction==='cancel'?'Event cancelled. Paid orders are unchanged.':'Event marked completed.'); await loadCatalogue(); }
+    catch (error) { if (error.status===401) handleError(error); else notify(error.message); }
   }
   function openEventEditor(event) {
     $('event-form').reset(); $('event-error').hidden = true;
