@@ -1,29 +1,51 @@
 # NATCON mobile testing
 
-The attendee and organizer Flutter projects retain their original screens and navigation. Their app entry points were restored locally after an earlier change had launched a small `services/mobile` prototype instead. The restored screens still call the purchased app's legacy `/user_api/` and `/orag_api/` contracts, while the deployed NATCON backend is `api/natcon.php`; the legacy routes remain blocked on the public host. So the original screens are back in source, but attendee login, booking, payment, organizer login, scanning, and management are not yet integrated with the live NATCON service.
+The attendee app, organizer app, public attendee site, and operations console are being wired to the canonical NATCON service. Shared registrations, tickets, event catalogue, coupon redemptions, payouts, and check-ins use the `natcon_*` records. Changes are local to this branch until the web server receives the code and the NATCON migrations have run.
+
+## Routes
+
+- Public attendee portal: `https://natcon.my360school.com/conference/`. It defaults to the primary NATCON event. A shared catalogue event can be selected in the page, or opened directly with `?event_id=<id>`.
+- Staff login for Admin, Finance, and Registrar: `https://natcon.my360school.com/operations/`. The same assigned staff email/password is used in the organizer app. Server-side role checks decide which actions are allowed.
+- Attendee app: use its existing sign-up and sign-in screens. Account creation/login is separate from organizer staff login. App registration uses the same event, ticket type, server pricing, Paystack verification, and ticket records as the web portal.
+- Organizer app: use staff credentials. Admin manages events, ticket types, coupons, and event status; Finance reviews payouts; Admin and Registrar scan tickets. The app and web console address the same API and check-in records.
+
+The operations page currently has no browser form for secret settings. Paystack and email transport are configured on the server through the private `.env.natcon` and PHP mail transport. Do not put either secret in a Flutter build or commit it. The configured public host must deploy the current code and migrations before these routes can use the new API behavior.
 
 ## Build debug APKs
 
-After Android SDK licenses have been accepted and Android SDK Platform 33, Build Tools 34, Java 17, and Flutter/Dart are available, run:
+Use Java 17 and the configured Android SDK. From each app directory:
 
 ```powershell
-cd natcon-user-app
-flutter build apk --debug --dart-define=NATCON_BASE_URL=https://natcon.my360school.com
-
-cd ../natcon-organizer-app
+flutter test
 flutter build apk --debug --dart-define=NATCON_BASE_URL=https://natcon.my360school.com
 ```
 
-Artifacts are written under each app's `build/app/outputs/flutter-apk/`. These debug APKs use debug signing and are for direct device installation only; they are not Play Store releases. Flutter's `NATCON_BASE_URL` define only changes the host. It does not translate the old API contract into the NATCON service contract.
+Artifacts are written to `build/app/outputs/flutter-apk/app-debug.apk` in the corresponding app directory. They are debug-signed for direct test installation, not store release. Flutter may warn that the apps' Gradle, Android Gradle Plugin, or Kotlin versions need future upgrades.
 
-The organizer app includes a camera scanner, but its verifier calls the legacy `/orag_api/qr_ticket_verify.php` route and cannot validate NATCON tickets yet. Until the integration work is complete, use the role-based HTTPS staff console at `/operations/`, which uses `/api/natcon.php` and supports the registrar camera/manual scanner.
+## Before a live rehearsal
 
-## Before testing a full NATCON flow
+- Deploy the API code and run `php services/natcon/cli.php migrate` against the intended NATCON database. Keep a database backup and verify the migration output first.
+- Use assigned Admin, Finance, and Registrar test accounts. The temporary sample accounts already created for this task are not replacements for normal staff identities, and their credentials were delivered separately.
+- Set `PAYSTACK_SECRET_KEY` on the server to the Paystack test key, configure the webhook URL from `services/natcon/README.md`, and complete a real test checkout plus signed webhook rehearsal. Online payment is unavailable until this server setting is active.
+- Configure PHP SMTP/sendmail transport and `NATCON_MAIL_FROM`, schedule `php services/natcon/cli.php mail`, and verify delivery of a test ticket and account recovery email. A sender address alone does not configure SMTP.
+- Confirm the Firebase project, Android package IDs, signing fingerprints, and push products before testing purchased-app Firebase features. NATCON registration does not depend on Firebase authentication.
+- Test the scanner on two devices/browsers to verify that a check-in through one client is a duplicate in the other. Browser camera scanning requires HTTPS and permission.
 
-- Create admin, finance, and registrar users with the NATCON CLI. The sample accounts created for this task are temporary and use the credentials given separately.
-- Configure a Paystack test secret in the server-only `.env.natcon`, then complete a test checkout and signed webhook rehearsal. Without it, online payment is disabled; bank-transfer review remains available.
-- Configure PHP SMTP/sendmail and `NATCON_MAIL_FROM`, then send and receive a test ticket. A sender address alone does not configure mail transport.
-- Confirm the configured Firebase project, Android package IDs, SHA-1 fingerprints, and enabled Firebase products before relying on push/auth/cloud features in the old apps. Their checked-in Firebase files belong to the purchased app setup and do not connect them to NATCON registration.
-- Use two registrar phones or browsers to verify duplicate scan behavior. Camera scanning requires HTTPS and browser camera permission.
+## Local checks
 
-The NATCON web portal remains the working attendee registration and ticket channel. See [the integration plan](natcon-mobile-integration-plan.md) and [feature/API matrix](natcon-mobile-feature-matrix.md) for the shared-backend work. An APK compiling alone does not prove that its login, registration, payment, or scanner calls reach NATCON.
+From the repository root, run:
+
+```powershell
+php services/natcon/tests/gate.php
+php services/natcon/evals/run.php
+php services/natcon/evals/mobile-schema.php
+node conference/tests/gate.cjs
+node conference/tests/multi-event-http.e2e.cjs
+node conference/evals/flows.cjs
+node operations/tests/gate.cjs
+node operations/evals/flows.cjs
+```
+
+The HTTP end-to-end test uses an isolated temporary SQLite database and a local PHP server. It covers published event discovery, event/ticket selection, server-priced registration, and Admin coupon creation without reaching production services. Local gates do not replace the live Paystack, SMTP, or two-device rehearsal.
+
+See the [integration plan](natcon-mobile-integration-plan.md), [feature/API matrix](natcon-mobile-feature-matrix.md), and [NATCON service setup](../services/natcon/README.md) for current scope and remaining work.

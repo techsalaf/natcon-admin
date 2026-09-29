@@ -12,7 +12,7 @@ const dsn = `sqlite:${path.join(temp, 'natcon.sqlite').replaceAll('\\', '/')}`;
 const env = {...process.env, NATCON_DSN: dsn, NATCON_DB_USER: '', NATCON_DB_PASSWORD: '', NATCON_BASE_URL: 'http://127.0.0.1'};
 const phpQuote = value => `'${value.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 const bootstrap = path.join(repo, 'services/natcon/bootstrap.php');
-const fixture = `require ${phpQuote(bootstrap)}; $db=new PDO(${phpQuote(dsn)}); Natcon\\migrate($db); $category=(string)$db->query("SELECT id FROM natcon_categories WHERE status='active' ORDER BY id LIMIT 1")->fetchColumn(); $event=Natcon\\saveOrganizerEvent($db,['title'=>'HTTP Shared Event','pname'=>'Abuja Venue','cdesc'=>'HTTP flow','sdate'=>'2026-11-02','stime'=>'09:00','etime'=>'17:00','cat_id'=>$category,'status'=>'published']); Natcon\\saveOrganizerTicketType($db,['event_id'=>$event['event_id'],'etype'=>'HTTP Admission','price'=>'3210.50','tlimit'=>'5','status'=>'1']); echo $event['event_id'];`;
+const fixture = `require ${phpQuote(bootstrap)}; $db=new PDO(${phpQuote(dsn)}); Natcon\\migrate($db); $category=(string)$db->query("SELECT id FROM natcon_categories WHERE status='active' ORDER BY id LIMIT 1")->fetchColumn(); $event=Natcon\\saveOrganizerEvent($db,['title'=>'HTTP Shared Event','pname'=>'Abuja Venue','cdesc'=>'HTTP flow','sdate'=>'2026-11-02','stime'=>'09:00','etime'=>'17:00','cat_id'=>$category,'status'=>'published']); Natcon\\saveOrganizerTicketType($db,['event_id'=>$event['event_id'],'etype'=>'HTTP Admission','price'=>'3210.50','tlimit'=>'5','status'=>'1']); $db->prepare('INSERT INTO natcon_staff(name,email,password_hash,role) VALUES(?,?,?,?)')->execute(['E2E Admin','admin@example.test',password_hash('e2e-test-password',PASSWORD_DEFAULT),'admin']); echo $event['event_id'];`;
 
 async function freePort() {
   const server = net.createServer();
@@ -51,6 +51,14 @@ async function ready(url, child) {
       assert.equal(selected.data.event_id, Number(eventId));
       assert.equal(selected.data.ticket_types[0].ticket_type, 'HTTP Admission');
 
+      const loginResponse=await fetch(`${base}/api/natcon.php?action=login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:'admin@example.test',password:'e2e-test-password'})});
+      const login=await loginResponse.json(),cookie=loginResponse.headers.get('set-cookie')?.split(';')[0];
+      assert.equal(loginResponse.status,200);assert(login.data.csrf);assert(cookie);
+      const couponsResponse=await fetch(`${base}/api/natcon.php?action=coupons`,{headers:{Cookie:cookie}});assert.equal(couponsResponse.status,200);assert.deepEqual((await couponsResponse.json()).data,[]);
+      const saveCouponResponse=await fetch(`${base}/api/natcon.php?action=save_coupon`,{method:'POST',headers:{'content-type':'application/json',Cookie:cookie,'X-CSRF-Token':login.data.csrf},body:JSON.stringify({event_id:eventId,coupon_code:'HTTP10',title:'HTTP Coupon',subtitle:'Test offer',description:'Temporary E2E offer',discount_type:'percent',coupon_val:'10',min_amt:'1000',expire_date:'2026-12-31',usage_limit:'2',status:'1'})});
+      const savedCoupon=await saveCouponResponse.json();assert.equal(saveCouponResponse.status,200,JSON.stringify(savedCoupon));assert.equal(savedCoupon.data.saved,true);
+      const couponsAfterSave=await fetch(`${base}/api/natcon.php?action=coupons`,{headers:{Cookie:cookie}});assert.equal((await couponsAfterSave.json()).data[0].coupon_code,'HTTP10');
+
       const checkoutResponse = await fetch(`${base}/api/natcon.php?action=register`, {
         method: 'POST', headers: {'content-type':'application/json'},
         body: JSON.stringify({event_id:eventId,ticket_type_id:selected.data.ticket_types[0].typeid,consent:true,payer_name:'E2E Test',payer_email:'e2e@example.test',payer_phone:'08000000001',delegates:[{name:'E2E Delegate',email:'delegate@example.test',course:'Studies',institution:'Test Institution',level:'Graduate',whatsapp:'08000000002',calling_line:'',state_origin:'Osun',times_attended:0}]})
@@ -60,7 +68,7 @@ async function ready(url, child) {
       assert.equal(checkout.data.amount_kobo, 321050);
       assert.equal(checkout.data.event_id, Number(eventId));
       assert.equal(String(checkout.data.ticket_type_id), selected.data.ticket_types[0].typeid);
-      console.log('PASS public event catalogue → selected event/ticket API → server-priced registration HTTP flow');
+      console.log('PASS public event checkout and Admin session/CSRF coupon management HTTP flows');
     } finally { server.kill(); }
   } finally { fs.rmSync(temp, {recursive:true,force:true}); }
 })().catch(error => { console.error(error); process.exitCode = 1; });
