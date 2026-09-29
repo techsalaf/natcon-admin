@@ -15,9 +15,9 @@ function mobileStaffType(string $role): string {return match($role){'admin'=>'Or
 
 try {
     $client=clean($_GET['client']??'',20);$endpoint=clean($_GET['endpoint']??'',100);
-    if(!in_array($client,['user_api','orag_api'],true)||!preg_match('/^[A-Za-z0-9_/-]+\.php$/',$endpoint))mobileReply(['Result'=>'false','ResponseMsg'=>'Unknown mobile endpoint.'],404);
+    if(!in_array($client,['user_api','orag_api'],true)||!preg_match('#^[A-Za-z0-9_/-]+\.php$#',$endpoint))mobileReply(['Result'=>'false','ResponseMsg'=>'Unknown mobile endpoint.'],404);
     $endpoint=strtolower($endpoint);
-    $c=config();$db=database($c);$raw=file_get_contents('php://input');$maxBody=$client==='orag_api'&&in_array($endpoint,['add_event.php','edit_event.php'],true)?7200000:100000;if(strlen($raw)>$maxBody)throw new InvalidArgumentException('Request is too large.');
+    $c=config();$db=database($c);$raw=file_get_contents('php://input');$maxBody=$client==='orag_api'&&in_array($endpoint,['add_event.php','edit_event.php'],true)?7200000:($client==='orag_api'&&in_array($endpoint,['add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'],true)?4000000:100000);if(strlen($raw)>$maxBody)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid request body.');
     if($client==='user_api'&&$endpoint==='u_reg_user.php'){
         limit($db,'mobile-account-register:'.($_SERVER['REMOTE_ADDR']??''),10);
@@ -165,6 +165,16 @@ try {
         if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can manage NATCON coupons.'],403);
         $in['_staff_id']=(int)$staff['id'];$id=$endpoint==='update_coupon.php'?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;if($endpoint==='update_coupon.php'&&!$id)throw new InvalidArgumentException('Choose a valid coupon.');
         $saved=\Natcon\saveOrganizerCoupon($db,$in,$id?:null);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>$endpoint==='add_coupon.php'?'Coupon added to the NATCON catalogue.':'Coupon updated.','data'=>$saved]);
+    }
+    if($client==='orag_api'&&in_array($endpoint,['list_facility.php','list_restriction.php','list_artist.php','view_gallery.php','add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'],true)){
+        $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);$eventId=clean($in['event_id']??'',32);
+        if(in_array($endpoint,['list_facility.php','list_restriction.php','list_artist.php','view_gallery.php'],true)){
+            if(!in_array($staff['role'],['admin','finance','registrar'],true))mobileReply(['Result'=>'false','ResponseMsg'=>'Your role cannot view event content.'],403);
+            $kind=match($endpoint){'list_facility.php'=>'facility','list_restriction.php'=>'restriction','list_artist.php'=>'artist',default=>'gallery'};$rows=\Natcon\organizerEventContentList($db,$kind,$eventId);
+            $key=match($kind){'facility'=>'Facilitydata','restriction'=>'Restrictiondata','artist'=>'Artistdata',default=>'gallerydata'};mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event content loaded.',$key=>$rows]);
+        }
+        if($staff['role']!=='admin')mobileReply(['Result'=>'false','ResponseMsg'=>'Only Admin can manage event content.'],403);
+        $kind=str_contains($endpoint,'artist')?'artist':(str_contains($endpoint,'gallery')?'gallery':(str_contains($endpoint,'facility')?'facility':'restriction'));$id=str_starts_with($endpoint,'update_')?filter_var($in['record_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]):null;if(str_starts_with($endpoint,'update_')&&!$id)throw new InvalidArgumentException('Choose a valid event content record.');$saved=\Natcon\saveOrganizerEventContent($db,$kind,$in,$id?:null,(int)$staff['id']);mobileReply(['ResponseCode'=>'200','Result'=>'true','ResponseMsg'=>'Event content saved.','data'=>$saved]);
     }
     if($client==='orag_api'&&in_array($endpoint,['list_category.php','list_type.php','add_event.php','edit_event.php','add_type.php','edit_type.php','complete_event.php','cancle_event.php'],true)){
         $staff=staffForToken($db);if(!$staff)mobileReply(['Result'=>'false','ResponseMsg'=>'Please sign in.'],401);

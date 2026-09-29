@@ -13,6 +13,7 @@ const delegateForm = read('natcon-user-app/lib/screen/natcon_delegate_details.da
 const attendeeApi = read('natcon-user-app/lib/controller/bookevent_controller.dart');
 const attendeeAuth = read('natcon-user-app/lib/Api/natcon_http.dart');
 const checks = [
+  ['mobile router accepts legacy endpoint paths without regex delimiter warnings', router.includes("preg_match('#^[A-Za-z0-9_/-]+\\.php$#'" )],
   ['organizer UI exposes the three canonical staff roles', ['Admin', 'Finance', 'Registrar'].every(role => organizerLogin.includes(`"${role}"`))],
   ['legacy organizer role values map to NATCON server roles', router.includes("'admin'=>'Orgnizer','finance'=>'MANAGER','registrar'=>'SCANNER'")],
   ['canonical labels map to the legacy client response without trusting the selector', router.includes("'Admin'=>'Orgnizer','Finance'=>'MANAGER','Registrar'=>'SCANNER'") && router.includes("$requested!==$expected")],
@@ -43,6 +44,8 @@ const checks = [
   ['organizer event and ticket CMS routes share NATCON storage with Admin-only writes', ['add_event.php','edit_event.php','list_type.php','add_type.php','edit_type.php','list_category.php'].every(endpoint=>router.includes(endpoint)) && router.includes("$staff['role']!=='admin'") && read('services/natcon/bootstrap.php').includes('saveOrganizerEvent(') && read('services/natcon/bootstrap.php').includes('saveOrganizerTicketType(')],
   ['organizer event completion and cancellation use Admin-only canonical status transitions', ['complete_event.php','cancle_event.php'].every(endpoint=>router.includes(endpoint)) && router.includes('setOrganizerEventStatus($db') && read('services/natcon/bootstrap.php').includes("'paid_orders_preserved'=>true")],
   ['organizer coupon list and mutations use Admin-protected shared NATCON coupon records', ['coupon_list.php','add_coupon.php','update_coupon.php'].every(endpoint=>router.includes(endpoint)) && router.includes('organizerCoupons($db') && router.includes('saveOrganizerCoupon($db')],
+  ['organizer content routes read and write shared NATCON event records with Admin-only mutations', ['list_facility.php','list_restriction.php','list_artist.php','view_gallery.php','add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'].every(endpoint=>router.includes(endpoint)) && router.includes('organizerEventContentList($db') && router.includes('saveOrganizerEventContent($db') && read('services/natcon/bootstrap.php').includes('natcon_event_facility_links')],
+  ['speaker and gallery uploads use bounded private assets served through the authenticated media boundary', read('api/mobile-media.php').includes("$_GET['asset_id']") && read('services/natcon/bootstrap.php').includes('natcon_media_assets') && router.includes("in_array($endpoint,['add_artist.php','update_artist.php','add_gallery.php','update_gallery.php'],true)?4000000")],
   ['event artwork is bounded, stored on the shared event profile, and served through the NATCON media route', router.includes("$maxBody=") && read('services/natcon/bootstrap.php').includes('organizerImageBase64(') && read('api/mobile-media.php').includes("in_array($kind,['image','cover'],true)") && read('services/natcon/bootstrap.php').includes('image_base64 MEDIUMTEXT')],
 ];
 for (const [name, passed] of checks) console.log(`${passed ? 'PASS' : 'FAIL'} ${name}`);

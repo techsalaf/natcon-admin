@@ -86,13 +86,16 @@
     });
     $('coupon-event').replaceChildren(); $('coupon-event').add(new Option('Select event', ''));
     catalogue.events.forEach((event) => $('coupon-event').add(new Option(event.event_title,event.event_id)));
+    $('content-event').replaceChildren();catalogue.events.forEach(event=>$('content-event').add(new Option(event.event_title,event.event_id)));
     $('coupon-rows').replaceChildren(); $('coupon-empty').hidden = catalogue.coupons.length > 0;
     catalogue.coupons.forEach((coupon) => {
       const row=document.createElement('tr'), discount=coupon.discount_type==='percent'?`${coupon.coupon_val}%`:C.money(Math.round(Number(coupon.coupon_val)*100));
       row.append(detailCell(coupon.coupon_code,coupon.title),detailCell(coupon.event_title),detailCell(discount),detailCell(C.money(Math.round(Number(coupon.min_amt)*100))),detailCell(coupon.expire_date),detailCell(coupon.status==='1'?'Active':'Inactive'));
       const action=node('td'),edit=node('button','Edit','text-button');edit.addEventListener('click',()=>openCouponEditor(coupon));action.append(edit);row.append(action);$('coupon-rows').append(row);
     });
+    await loadEventContent();
   }
+  async function loadEventContent(){const kinds=['artist','gallery','facility','restriction'];const groups=await Promise.all(kinds.map(kind=>api.request('event_content',undefined,{kind})));const rows=groups.flatMap((items,index)=>items.map(item=>({...item,kind:kinds[index]})));$('content-rows').replaceChildren();$('content-empty').hidden=rows.length>0;rows.forEach(item=>{const row=document.createElement('tr');row.append(detailCell(({artist:'Speaker',gallery:'Gallery',facility:'Facility',restriction:'Restriction'})[item.kind],item.arole||''),detailCell(item.title),detailCell(item.event_title),detailCell(item.status==='1'?'Active':'Inactive'));$('content-rows').append(row);});}
   function openCouponEditor(coupon) {
     $('coupon-form').reset();$('coupon-error').hidden=true;$('coupon-title').textContent=coupon?'Edit coupon':'Create coupon';$('coupon-id').value=coupon?.id||'';
     $('coupon-event').value=coupon?.event_id||catalogue.events.find(event=>event.event_status==='published')?.event_id||'';$('coupon-code').value=coupon?.coupon_code||'';$('coupon-code').readOnly=!!coupon;
@@ -395,6 +398,7 @@
   $('close-coupon').addEventListener('click',()=>$('coupon-dialog').close());
   $('coupon-type').addEventListener('change',()=>{$('coupon-value').step=$('coupon-type').value==='percent'?'1':'0.01';$('coupon-value').max=$('coupon-type').value==='percent'?'100':'';});
   $('coupon-form').addEventListener('submit',async(event)=>{event.preventDefault();$('coupon-error').hidden=true;try{await api.request('save_coupon',{coupon_id:$('coupon-id').value||null,event_id:$('coupon-event').value,coupon_code:$('coupon-code').value.trim(),title:$('coupon-name').value.trim(),subtitle:$('coupon-subtitle').value.trim(),description:$('coupon-description').value.trim(),discount_type:$('coupon-type').value,coupon_val:$('coupon-value').value.trim(),min_amt:$('coupon-minimum').value.trim(),expire_date:$('coupon-expiry').value,usage_limit:$('coupon-limit').value,status:$('coupon-status').value});$('coupon-dialog').close();notify('Coupon saved to the shared NATCON catalogue.');await loadCatalogue();}catch(error){if(error.status===401)handleError(error);else showError('coupon-error',error);}});
+  $('content-form').addEventListener('submit',async(event)=>{event.preventDefault();$('content-error').hidden=true;const kind=$('content-kind').value;try{if(!catalogue.events.length)throw new Error('Create an event before adding event content.');const title=$('content-title').value.trim(),payload={kind,event_id:$('content-event').value,status:'1'};if(kind==='artist')Object.assign(payload,{artist_name:title,artist_role:$('content-role').value.trim(),img:$('content-image').value.trim()||'0'});else if(kind==='gallery')Object.assign(payload,{title,img:$('content-image').value.trim()});else Object.assign(payload,{title,description:$('content-description').value.trim()});await api.request('save_event_content',payload);$('content-form').reset();notify('Event content saved to the shared NATCON catalogue.');await loadEventContent();}catch(error){if(error.status===401)handleError(error);else showError('content-error',error);}});
   $('close-event').addEventListener('click', () => $('event-dialog').close());
   $('event-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('event-error').hidden = true;

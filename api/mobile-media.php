@@ -4,6 +4,8 @@ require_once dirname(__DIR__).'/services/natcon/bootstrap.php';
 use function Natcon\{config,database,query,staffForToken};
 
 try {
+    $assetId=filter_var($_GET['asset_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
+    if($assetId){$db=database(config());$asset=query($db,'SELECT a.image_base64,a.mime_type,e.status FROM natcon_media_assets a JOIN natcon_events e ON e.id=a.event_id WHERE a.id=?',[$assetId])->fetch();if(!$asset||($asset['status']!=='published'&&!staffForToken($db))){http_response_code(404);exit;}$bytes=base64_decode((string)$asset['image_base64'],true);if(!$bytes||!in_array($asset['mime_type'],['image/jpeg','image/png','image/gif','image/webp'],true)){http_response_code(404);exit;}header('Content-Type: '.$asset['mime_type']);header('Content-Length: '.strlen($bytes));header('Cache-Control: '.($asset['status']==='published'?'public, max-age=300':'private, no-store'));header('X-Content-Type-Options: nosniff');echo $bytes;exit;}
     $eventId=filter_var($_GET['event_id']??null,FILTER_VALIDATE_INT,['options'=>['min_range'=>1]]);
     $kind=(string)($_GET['kind']??'');
     if(!$eventId||!in_array($kind,['image','cover'],true)){http_response_code(404);exit;}

@@ -19,6 +19,7 @@ const flows = {
   'web and organizer apps write ticket types to the same canonical ticket service': source.includes("api.request('save_ticket_type'") && server.includes('saveOrganizerTicketType($db,') && backend.includes('function saveOrganizerTicketType('),
   'Admin event completion and cancellation update shared catalogue state without voiding paid orders': source.includes("api.request('event_status'") && server.includes("action==='event_status'") && backend.includes('function setOrganizerEventStatus(') && backend.includes("'paid_orders_preserved'=>true"),
   'web coupon list and edits share event-scoped coupon records with attendee checkout': source.includes("api.request('coupons')") && source.includes("api.request('save_coupon'") && server.includes('organizerCoupons($db') && backend.includes('function saveOrganizerCoupon(') && backend.includes('applicableCoupon('),
+  'Admin web event content flows into the same mobile attendee and organizer event detail': source.includes("api.request('event_content'") && source.includes("api.request('save_event_content'") && server.includes('organizerEventContentList($db') && backend.includes('function eventContent(') && backend.includes('saveEventContentAsset('),
 };
 const passed = Object.values(flows).filter(Boolean).length;
 for (const [flow, result] of Object.entries(flows)) console.log(`${result ? 'PASS' : 'FAIL'} ${flow}`);
