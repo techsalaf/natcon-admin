@@ -12,6 +12,8 @@ const attendeeCheckout = read('natcon-user-app/lib/screen/order_details.dart');
 const delegateForm = read('natcon-user-app/lib/screen/natcon_delegate_details.dart');
 const attendeeApi = read('natcon-user-app/lib/controller/bookevent_controller.dart');
 const attendeeAuth = read('natcon-user-app/lib/Api/natcon_http.dart');
+const attendeeGoogle = JSON.parse(read('natcon-user-app/android/app/google-services.json'));
+const organizerGoogle = JSON.parse(read('natcon-organizer-app/android/app/google-services.json'));
 const checks = [
   ['mobile router accepts legacy endpoint paths without regex delimiter warnings', router.includes("preg_match('#^[A-Za-z0-9_/-]+\\.php$#'" )],
   ['organizer UI exposes the three canonical staff roles', ['Admin', 'Finance', 'Registrar'].every(role => organizerLogin.includes(`"${role}"`))],
@@ -20,6 +22,9 @@ const checks = [
   ['dashboard requires an authenticated staff bearer token', router.includes("$endpoint==='u_dashboard.php'") && router.includes('staffForToken($db)')],
   ['scan route calls canonical NATCON check-in and checks role', router.includes('qr_ticket_verify.php') && router.includes("['admin','registrar']") && router.includes('\\Natcon\\checkin(')],
   ['organizer HTTP client sends tokens only to NATCON API paths', organizerAuth.includes("uri.path.contains('/orag_api/')") && organizerAuth.includes("headers['Authorization'] = 'Bearer $token'")],
+  ['both native clients use the direct adapter path instead of blocked legacy URL prefixes', read('natcon-user-app/lib/Api/config.dart').includes('/api/mobile.php?client=user_api&endpoint=') && read('natcon-organizer-app/lib/api_screens/confrigation.dart').includes('/api/mobile.php?client=orag_api&endpoint=')],
+  ['organizer token interceptor authenticates direct mobile-adapter requests', organizerAuth.includes("uri.path.endsWith('/api/mobile.php')") && organizerAuth.includes("uri.queryParameters['client']")],
+  ['Android application IDs match their registered Firebase clients', read('natcon-user-app/android/app/build.gradle.kts').includes('applicationId = "com.eventlycustomerapp"') && attendeeGoogle.client.some(client => client.client_info.android_client_info.package_name === 'com.eventlycustomerapp') && read('natcon-organizer-app/android/app/build.gradle.kts').includes('applicationId = "com.evently.organizer"') && organizerGoogle.client.some(client => client.client_info.android_client_info.package_name === 'com.evently.organizer')],
   ['mobile account login and registration use NATCON-owned accounts', router.includes("$endpoint==='u_reg_user.php'") && router.includes('createAccount($db,$in)') && router.includes('loginAccount($db,$in)')],
   ['both apps revoke their server token and clear it on sign-out', organizerShell.includes("action=logout") && organizerShell.includes("remove('NATCON_ACCESS_TOKEN')") && attendeeProfile.includes('action=account_logout') && attendeeProfile.includes("remove('NATCON_ACCESS_TOKEN')")],
   ['attendee history and ticket detail are routed through account-owned service functions', router.includes("ticket_status_wise.php") && router.includes('mobileTicketHistory($db,(int)$account[\'id\'],$c)') && router.includes('mobileTicketInfo($db,(int)$account[\'id\'],$token,$c)')],

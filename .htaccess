@@ -5,6 +5,7 @@ DirectoryIndex index.php
 # available for maintenance, but its unauthenticated APIs must not be exposed.
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteRule ^conference/privacy/?$ conference/privacy.php [L,NC]
     # Route only legacy Flutter API requests to the allowlisted NATCON adapter.
     # The purchased PHP endpoints themselves remain inaccessible.
     RewriteRule ^(user_api|orag_api)/([A-Za-z0-9_/-]+\.php)$ api/mobile.php?client=$1&endpoint=$2 [QSA,L]
@@ -25,3 +26,7 @@ DirectoryIndex index.php
     Header always set X-Frame-Options "DENY"
     Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=()"
 </IfModule>
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^\.]+)$ .php [NC,L]

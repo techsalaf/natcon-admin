@@ -2,7 +2,7 @@
 
 class AppUrl {
   static const String imageurl = String.fromEnvironment('NATCON_BASE_URL', defaultValue: 'https://unconfigured.invalid/');
-  static final String baseUrl ='${imageurl.replaceFirst(RegExp(r'/+$'), '')}/orag_api/';
+  static final String baseUrl ='${imageurl.replaceFirst(RegExp(r'/+$'), '')}/api/mobile.php?client=orag_api&endpoint=';
 
   static const oneSignel = "*************";
 

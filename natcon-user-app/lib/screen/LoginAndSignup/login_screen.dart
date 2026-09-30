@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 15),
-                          child: IntlPhoneField(
+                          child: IntlPhoneField(initialCountryCode: 'NG', 
                             keyboardType: TextInputType.number,
                             cursorColor: BlackColor,
                             inputFormatters: [

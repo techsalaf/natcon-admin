@@ -13,6 +13,20 @@
 # Local diagnostics
 /debug_activation_data.html
 /test.txt
+/check_*.py
+/deploy*.py
+/do_migrate*.py
+/find_error.py
+/fix_*.py
+/improve_*.py
+/list.py
+/make_py.ps1
+/remote_*.txt
+/run_migrate*.py
+/run_web_migrate*.py
+/icon_b64.txt
+/scripts/check_users.php
+/scripts/create_test_accounts.php
 
 # Flutter and Android build output
 **/.dart_tool/

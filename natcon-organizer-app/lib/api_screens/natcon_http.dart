@@ -9,7 +9,9 @@ class NatconHttp {
     final headers = <String, String>{...?supplied};
     final natconApi = uri.path.contains('/user_api/') ||
         uri.path.contains('/orag_api/') ||
-        uri.path.endsWith('/api/natcon.php');
+      uri.path.endsWith('/api/natcon.php') ||
+      (uri.path.endsWith('/api/mobile.php') &&
+        const {'user_api', 'orag_api'}.contains(uri.queryParameters['client']));
     final token = getData.read('NATCON_ACCESS_TOKEN')?.toString() ?? '';
     if (natconApi && token.isNotEmpty) headers['Authorization'] = 'Bearer $token';
     return headers;

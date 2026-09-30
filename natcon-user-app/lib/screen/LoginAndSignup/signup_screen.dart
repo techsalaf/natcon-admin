@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:magicmate_user/screen/LoginAndSignup/resetpassword_screen.dart';
 import '../../Api/data_store.dart';
 import '../../controller/msg_otp_controller.dart';
@@ -309,7 +310,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 15),
-                          child: IntlPhoneField(
+                          child: IntlPhoneField(initialCountryCode: 'NG', 
                             keyboardType: TextInputType.number,
                             cursorColor: BlackColor,
                             inputFormatters: [
@@ -672,3 +673,4 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 }
+

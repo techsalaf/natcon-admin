@@ -19,6 +19,8 @@ const cases = {
   'scanner supports manual entry': html.includes('id="ticket-code"') && js.includes("api.request('checkin'"),
   'scanner handles already-checked-in state': js.includes('already_checked_in'),
   'camera is stopped when hidden': js.includes("document.addEventListener('visibilitychange'") && js.includes('stopCamera'),
+  'session expiry tolerates dialogs missing from older deployed markup': js.includes("$(id)?.close()") && js.includes("'coupon-dialog', 'cancel-dialog'"),
+  'finance can open a validated transfer receipt in a new tab': js.includes("'View uploaded receipt'") && js.includes('receipt_url') && js.includes("receipt.rel = 'noopener noreferrer'"),
   'untrusted delegate strings use DOM text nodes': js.includes("detailCell(delegate.name") && js.includes("document.createElement(tag)"),
   'staff register shows course institution status and NATCON history': js.includes('delegate.course') && js.includes('delegate.institution') && js.includes('delegate.level') && js.includes('delegate.times_attended'),
   'payout records share paid revenue, reservations, and available balance': html.includes('id="payout-revenue"') && html.includes('id="payout-reserved"') && html.includes('id="payout-available"') && js.includes("api.request('payouts')"),

@@ -9,7 +9,7 @@ function config(): array {
     }
     return ['dsn'=>getenv('NATCON_DSN') ?: '', 'db_user'=>getenv('NATCON_DB_USER') ?: '', 'db_password'=>getenv('NATCON_DB_PASSWORD') ?: '',
         'base_url'=>rtrim(getenv('NATCON_BASE_URL') ?: 'http://localhost/natcon-admin','/'), 'secret'=>getenv('PAYSTACK_SECRET_KEY') ?: '',
-        'name'=>'NATCON 2026 Â· Reformation', 'theme'=>'Knowledge with Purpose: Raising Responsible Muslim Leaders.',
+        'name'=>'NATCON 2026 · Reformation', 'theme'=>'Knowledge with Purpose: Raising Responsible Muslim Leaders.',
         'start_date'=>'2026-10-01','end_date'=>'2026-10-04','venue'=>'Shaykh Idrees Fazazi Mogaji Central Mosque, Iwo, Osun State',
         'currency'=>'NGN','earlybird_end'=>'2026-09-15','capacity'=>(int)(getenv('NATCON_CAPACITY')?:0),'registration_closes'=>getenv('NATCON_REGISTRATION_CLOSES')?:'2026-10-04 23:59:59','bank'=>['name'=>'LOTUS Bank','account_name'=>'THE ACHIEVER AMBASSADOR (NATCON ACC)','account_number'=>'1014319395']];
 }
@@ -156,7 +156,7 @@ function payoutNairaToKobo(mixed $amount): int {
 }
 function requestPayout(\PDO $db,int $staffId,int $amountKobo,array $details): array {
     $type=clean($details['r_type']??'',32);if(!in_array($type,['BANK Transfer','UPI','Paypal'],true))throw new \InvalidArgumentException('Choose a supported payout destination.');
-    if($amountKobo<100)throw new \InvalidArgumentException('The minimum payout request is â‚¦1.00.');
+    if($amountKobo<100)throw new \InvalidArgumentException('The minimum payout request is ₦1.00.');
     $bank=clean($details['bank_name']??'',120);$name=clean($details['acc_name']??'',150);$account=clean($details['acc_number']??'',40);$ifsc=clean($details['ifsc_code']??'',24);$upi=clean($details['upi_id']??'',190);$paypal=strtolower(clean($details['paypal_id']??'',190));
     if($type==='BANK Transfer'&&(!$bank||!$name||!preg_match('/^[0-9]{8,40}$/',$account)))throw new \InvalidArgumentException('Provide a bank name, account holder, and valid account number.');
     if($type==='UPI'&&!preg_match('/^[A-Za-z0-9._-]{2,100}@[A-Za-z0-9.-]{2,80}$/',$upi))throw new \InvalidArgumentException('Provide a valid UPI ID.');
@@ -366,7 +366,7 @@ function mobileEventDetails(\PDO $db,array $c,?int $accountId=null,string $event
     if($accountId)$favorite=(int)query($db,'SELECT COUNT(*) FROM natcon_favorites WHERE account_id=? AND event_id=?',[$accountId,$event['id']])->fetchColumn();
     $start=substr((string)$event['starts_at'],0,10);$end=substr((string)$event['ends_at'],0,10);$tags=array_values(array_filter(array_map('trim',explode(',',(string)($profile['tags']??'')))));$videos=array_values(array_filter(array_map('trim',explode(',',(string)($profile['video_urls']??'')))));
     $content=eventContent($db,(int)$event['id']);
-    return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>$image,'event_cover_img'=>$cover?[$cover]:[],'event_sdate'=>$start,'event_time_day'=>$start===$end?$start:$start.' â€“ '.$end,'event_address_title'=>$event['venue'],'event_address'=>$event['venue'],'event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','event_disclaimer'=>$profile['disclaimer']??'Each delegate must present their own paid event ticket.','event_about'=>$event['description'],'event_tags'=>$tags,'event_video_urls'=>$videos,'event_gallery'=>$content['gallery'],'event_artists'=>$content['artists'],'event_facilities'=>$content['facilities'],'event_restrictions'=>$content['restrictions'],'ticket_price'=>$type['ticket_price']??'0.00','IS_BOOKMARK'=>$favorite?1:0,'sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_name'=>'The Achiever Ambassadors Islamic Foundation','sponsore_mobile'=>'','total_ticket'=>$type?($cap?:99999):0,'is_joined'=>$accountId?(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE account_id=? AND status='paid' AND event_id=?",[$accountId,$event['id']])->fetchColumn():0,'total_book_ticket'=>$paid,'member_list'=>[]];
+    return ['event_id'=>(string)$event['id'],'event_title'=>$event['title'],'event_img'=>$image,'event_cover_img'=>$cover?[$cover]:[],'event_sdate'=>$start,'event_time_day'=>$start===$end?$start:$start.' – '.$end,'event_address_title'=>$event['venue'],'event_address'=>$event['venue'],'event_latitude'=>$event['latitude']??'0','event_longtitude'=>$event['longitude']??'0','event_disclaimer'=>$profile['disclaimer']??'Each delegate must present their own paid event ticket.','event_about'=>$event['description'],'event_tags'=>$tags,'event_video_urls'=>$videos,'event_gallery'=>$content['gallery'],'event_artists'=>$content['artists'],'event_facilities'=>$content['facilities'],'event_restrictions'=>$content['restrictions'],'ticket_price'=>$type['ticket_price']??'0.00','IS_BOOKMARK'=>$favorite?1:0,'sponsore_id'=>'NATCON','sponsore_img'=>'','sponsore_name'=>'The Achiever Ambassadors Islamic Foundation','sponsore_mobile'=>'','total_ticket'=>$type?($cap?:99999):0,'is_joined'=>$accountId?(int)query($db,"SELECT COUNT(*) FROM natcon_orders WHERE account_id=? AND status='paid' AND event_id=?",[$accountId,$event['id']])->fetchColumn():0,'total_book_ticket'=>$paid,'member_list'=>[]];
 }
 function mobileTicketTypes(\PDO $db,array $c,string $eventId=''): array {
     $event=$eventId===''?primaryConference($db):publishedEvent($db,$eventId);$at=now();$rows=query($db,"SELECT * FROM natcon_ticket_types WHERE event_id=? AND status='active' AND (sales_start IS NULL OR sales_start<=?) AND (sales_end IS NULL OR sales_end>=?) ORDER BY price_kobo,id",[$event['id'],$at,$at])->fetchAll();
@@ -410,7 +410,7 @@ function walletHistory(\PDO $db,int $accountId): array {
     return array_map(static function($row){$credit=$row['direction']==='credit';return ['message'=>$row['description'],'status'=>$credit?'Credit':'Debit','amt'=>number_format((int)$row['amount_kobo']/100,2,'.',''),'tdate'=>$row['created_at']];},query($db,'SELECT direction,amount_kobo,description,created_at FROM natcon_wallet_ledger WHERE account_id=? AND status IN (\'paid\',\'completed\') ORDER BY id DESC',[$accountId])->fetchAll());
 }
 function initializeWalletTopup(\PDO $db,array $c,int $accountId,int $amountKobo): array {
-    if($amountKobo<10000||$amountKobo>100000000)throw new \InvalidArgumentException('Wallet top-up must be between â‚¦100 and â‚¦1,000,000.');
+    if($amountKobo<10000||$amountKobo>100000000)throw new \InvalidArgumentException('Wallet top-up must be between ₦100 and ₦1,000,000.');
     $account=query($db,'SELECT email FROM natcon_accounts WHERE id=? AND status=?',[$accountId,'active'])->fetch();if(!$account)throw new \InvalidArgumentException('Attendee account is unavailable.');
     $reference='WAL-'.strtoupper(bin2hex(random_bytes(10)));
     query($db,'INSERT INTO natcon_wallet_ledger(account_id,direction,amount_kobo,reference,status,description,created_at) VALUES(?,?,?,?,?,?,?)',[$accountId,'credit',$amountKobo,$reference,'pending','Wallet top-up',now()]);
@@ -436,7 +436,7 @@ function availableCoupons(\PDO $db,int $subtotalKobo=0,string $eventId=''): arra
 function applicableCoupon(\PDO $db,string $code,int $subtotal,string $eventId=''): array {
     $event=$eventId===''?primaryConference($db):publishedEvent($db,$eventId);$coupon=query($db,"SELECT * FROM natcon_coupons WHERE code=? AND status='active' AND (event_id IS NULL OR event_id=?) AND (expires_at IS NULL OR DATE(expires_at)>=?) AND (usage_limit=0 OR usage_count<usage_limit)",[$code,$event['id'],gmdate('Y-m-d')])->fetch();
     if(!$coupon)throw new \InvalidArgumentException('This coupon is invalid, expired, or fully redeemed.');
-    if($subtotal<(int)$coupon['minimum_kobo'])throw new \InvalidArgumentException('The order does not meet this couponâ€™s minimum spend.');
+    if($subtotal<(int)$coupon['minimum_kobo'])throw new \InvalidArgumentException('The order does not meet this coupon’s minimum spend.');
     if($coupon['discount_type']==='percent'){
         if((int)$coupon['discount_value']<1||(int)$coupon['discount_value']>100)throw new \RuntimeException('Coupon percentage is misconfigured.');
         $discount=(int)floor($subtotal*(int)$coupon['discount_value']/100);
@@ -460,7 +460,7 @@ function event(array $c,?\PDO $db=null,?string $eventId=null): array {
 function order(\PDO $db,string $reference,string $token): array {
     $o=query($db,'SELECT * FROM natcon_orders WHERE reference=? AND access_token=?',[$reference,$token])->fetch();
     if (!$o) throw new \InvalidArgumentException('Registration not found.');
-    unset($o['id']); $o['delegates']=query($db,'SELECT id,name,ticket_token FROM natcon_delegates WHERE reference=?',[$reference])->fetchAll();
+    unset($o['id'],$o['receipt_url']); $o['delegates']=query($db,'SELECT id,name,ticket_token FROM natcon_delegates WHERE reference=?',[$reference])->fetchAll();
     if($o['status']!=='paid') foreach($o['delegates'] as &$d) unset($d['ticket_token']);
     return $o;
 }
@@ -471,10 +471,17 @@ function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
     $name=clean($in['payer_name']??'',150);$email=strtolower(clean($in['payer_email']??''));$phone=clean($in['payer_phone']??'',40);$delegates=$in['delegates']??[];
     $paymentMethod=clean($in['payment_method']??'paystack',30);
     if(!in_array($paymentMethod,['paystack','transfer_prepaid','transfer_new','cash'],true))throw new \InvalidArgumentException('Invalid payment method.');
+    $receiptUrl=$in['receipt_url']??null;$receiptRequired=in_array($paymentMethod,['transfer_prepaid','transfer_new'],true);
+    if($receiptRequired&&(!is_string($receiptUrl)||$receiptUrl===''))throw new \InvalidArgumentException('Attach your bank transfer receipt as a PDF or image.');
+    if($receiptUrl!==null){
+        if(!is_string($receiptUrl)||strlen($receiptUrl)>3400000||!preg_match('/^data:(application\/pdf|image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+\/]+={0,2})$/',$receiptUrl,$receiptMatch))throw new \InvalidArgumentException('Use a PDF, JPEG, PNG, or WebP receipt no larger than 2.5 MB.');
+        $receiptBytes=base64_decode($receiptMatch[2],true);$receiptMime=$receiptBytes===false?false:(new \finfo(FILEINFO_MIME_TYPE))->buffer($receiptBytes);
+        if($receiptBytes===false||strlen($receiptBytes)>2500000||$receiptMime!==$receiptMatch[1])throw new \InvalidArgumentException('The receipt file is invalid or does not match its file type.');
+    }
     if(!$name || !filter_var($email,FILTER_VALIDATE_EMAIL) || !$phone || !is_array($delegates) || count($delegates)<1 || count($delegates)>50) throw new \InvalidArgumentException('Provide payer name, valid email, phone, and between 1 and 50 delegates.');
     foreach($delegates as $d) {
         if(!is_array($d)||!clean($d['name']??'',150) || !filter_var(clean($d['email']??''),FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Every delegate needs a name and valid Gmail or email address.');
-        foreach(['course','institution','level','whatsapp','state_origin'] as $required) if(!clean($d[$required]??'')) throw new \InvalidArgumentException('Complete each delegateâ€™s course, institution, level, WhatsApp number, and state of origin.');
+        foreach(['course','institution','level','whatsapp','state_origin'] as $required) if(!clean($d[$required]??'')) throw new \InvalidArgumentException('Complete each delegate’s course, institution, level, WhatsApp number, and state of origin.');
         if(!preg_match('/^\d{1,2}$/',clean($d['times_attended']??'')) || (int)$d['times_attended']>99) throw new \InvalidArgumentException('Enter NATCON attendance from 0 to 99.');
         if($paymentMethod==='transfer_prepaid'){
             $did=clean($d['delegate_card_id']??'',50);
@@ -495,9 +502,8 @@ function register(\PDO $db,array $c,array $in,?int $accountId=null): array {
             $updated=query($db,'UPDATE natcon_coupons SET usage_count=usage_count+1 WHERE id=? AND status=? AND (usage_limit=0 OR usage_count<usage_limit)',[$coupon['id'],'active']);if(!$updated->rowCount())throw new \InvalidArgumentException('This coupon was just fully redeemed.');
         }
         if($useWallet&&$amount>0){$balance=(int)query($db,'SELECT wallet_balance_kobo FROM natcon_accounts WHERE id=? AND status=?',[$accountId,'active'])->fetchColumn();$walletSpend=min($balance,$amount);if($walletSpend>0){$debited=query($db,'UPDATE natcon_accounts SET wallet_balance_kobo=wallet_balance_kobo-?,updated_at=? WHERE id=? AND wallet_balance_kobo>=?',[$walletSpend,now(),$accountId,$walletSpend]);if(!$debited->rowCount())throw new \InvalidArgumentException('Wallet balance changed. Refresh and try again.');$amount-=$walletSpend;}}
-        $orderStatus=($amount===0 && $paymentMethod==='paystack')?'paid':'pending';
-        if($paymentMethod==='cash')$orderStatus='awaiting_review'; // Cash pends until collected
-        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id,event_id,ticket_type_id,subtotal_kobo,coupon_id,discount_kobo,wallet_kobo,paid_at,payment_method) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,$selectedEvent['currency']?:'NGN',$orderStatus,now(),$accountId,$eventId,$type['id'],$subtotal,$coupon['id']??null,$discount,$walletSpend,$orderStatus==='paid'?now():null,$paymentMethod]);
+        $orderStatus=($amount===0 && $paymentMethod==='paystack')?'paid':(in_array($paymentMethod,['transfer_prepaid','transfer_new','cash']) ? 'awaiting_review' : 'pending'); // Cash pends until collected
+        query($db,'INSERT INTO natcon_orders(reference,access_token,payer_name,payer_email,payer_phone,amount_kobo,currency,status,created_at,account_id,event_id,ticket_type_id,subtotal_kobo,coupon_id,discount_kobo,wallet_kobo,paid_at,payment_method,receipt_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,$token,$name,$email,$phone,$amount,$selectedEvent['currency']?:'NGN',$orderStatus,now(),$accountId,$eventId,$type['id'],$subtotal,$coupon['id']??null,$discount,$walletSpend,$orderStatus==='paid'?now():null,$paymentMethod,$receiptUrl]);
         if($walletSpend>0)query($db,'INSERT INTO natcon_wallet_ledger(account_id,direction,amount_kobo,reference,status,description,created_at) VALUES(?,?,?,?,?,?,?)',[$accountId,'debit',$walletSpend,'SPEND-'.$ref,$orderStatus==='paid'?'paid':'pending','NATCON ticket checkout '.$ref,now()]);
         if($coupon)query($db,'INSERT INTO natcon_coupon_redemptions(coupon_id,account_id,order_reference,discount_kobo,created_at) VALUES(?,?,?,?,?)',[$coupon['id'],$accountId,$ref,$discount,now()]);
         foreach($delegates as $d) query($db,'INSERT INTO natcon_delegates(reference,name,email,phone,delegate_card_id,state,education,accommodation,accessibility,course,institution,level,whatsapp,calling_line,state_origin,times_attended,ticket_token) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',[$ref,clean($d['name'],150),strtolower(clean($d['email'],190)),clean($d['whatsapp'],40),clean($d['delegate_card_id']??'',50),clean($d['state_origin'],100),clean($d['level'],80),clean($d['accommodation']??'',100),clean($d['accessibility']??'',1000),clean($d['course'],150),clean($d['institution'],190),clean($d['level'],80),clean($d['whatsapp'],40),clean($d['calling_line']??'',40),clean($d['state_origin'],100),(int)$d['times_attended'],bin2hex(random_bytes(32))]);
@@ -521,7 +527,7 @@ function queueTickets(\PDO $db,array $c,string $ref): void {
     $ds=query($db,'SELECT name,email,ticket_token FROM natcon_delegates WHERE reference=?',[$ref])->fetchAll();
     $body="Assalamu alaykum {$o['payer_name']},\nYour {$eventTitle} registration {$ref} is confirmed.\n\n";
     foreach($ds as $d)$body.=$d['name'].': '.$c['base_url'].'/conference/ticket.php#'.$d['ticket_token']."\n";
-    $body.="\n{$start}".($end!==$start?' to '.$end:'')." Â· {$event['venue']}. Present your personal ticket at the venue. Keep these links private.";
+    $body.="\n{$start}".($end!==$start?' to '.$end:'')." · {$event['venue']}. Present your personal ticket at the venue. Keep these links private.";
     query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$o['payer_email'],'Your tickets for '.$eventTitle,$body,'pending',now()]);
     foreach($ds as $d)if($d['email'] && strcasecmp($d['email'],$o['payer_email'])!==0)query($db,'INSERT INTO natcon_outbox(recipient,subject,body,status,created_at) VALUES(?,?,?,?,?)',[$d['email'],'Your personal ticket for '.$eventTitle,"Assalamu alaykum {$d['name']},\nYour ticket: ".$c['base_url'].'/conference/ticket.php#'.$d['ticket_token']."\nKeep this link private.",'pending',now()]);
 }
@@ -581,4 +587,6 @@ function limit(\PDO $db,string $key,int $max=15,int $seconds=300): void {
         query($db,'UPDATE natcon_limits SET count=count+1 WHERE bucket=?',[$key]);$n=query($db,'SELECT count FROM natcon_limits WHERE bucket=?',[$key])->fetchColumn();$db->commit();
     }catch(\Throwable $e){$db->rollBack();throw $e;}if($n>$max)throw new \InvalidArgumentException('Too many attempts. Please wait a few minutes.');
 }
+
+
 

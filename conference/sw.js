@@ -1,5 +1,5 @@
 'use strict';
-const CACHE = 'natcon-static-v1';
+const CACHE = 'natcon-static-v5';
 const ASSETS = ['assets/style.css','assets/app.js','assets/ticket.js','assets/icon.svg','manifest.webmanifest','offline.html'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('natcon-static-') && key !== CACHE).map(key => caches.delete(key))))));

@@ -236,13 +236,13 @@ Future OrderPlacedSuccessfully() {
 class provider {
   static String discover = "Find your favorite events here".tr;
   static String healthy =
-      "Connect, Discover, and Experience \n All with Join Event App!".tr;
+      "Connect, Discover, and Experience \n All with NATCON App!".tr;
   static String order = "Find your nearby event here".tr;
   static String orderthe =
       "Join the Fun - Your One \n Stop Destination for Events!".tr;
   static String lets = "Update your upcoming event here".tr;
   static String cooking =
-      "Experience Life to the Fullest \n Join Event App has You Covered!".tr;
+      "Experience Life to the Fullest \n NATCON App has You Covered!".tr;
   static String getstart = "Get Started".tr;
   static String skip = "Skip".tr;
   static String next = "Next".tr;

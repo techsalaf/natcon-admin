@@ -74,6 +74,19 @@ async function ready(url, child) {
       assert.equal(checkout.data.amount_kobo, 321050);
       assert.equal(checkout.data.event_id, Number(eventId));
       assert.equal(String(checkout.data.ticket_type_id), selected.data.ticket_types[0].typeid);
+
+      const receiptPdf=Buffer.from('%PDF-1.4\n1 0 obj <<>> endobj\ntrailer <<>>\n%%EOF\n').toString('base64');
+      const transferRegistration={event_id:eventId,ticket_type_id:selected.data.ticket_types[0].typeid,consent:true,payer_name:'Transfer Test',payer_email:'transfer@example.test',payer_phone:'08000000003',payment_method:'transfer_new',delegates:[{name:'Transfer Delegate',email:'transfer-delegate@example.test',course:'Studies',institution:'Test Institution',level:'Graduate',whatsapp:'08000000004',calling_line:'',state_origin:'Osun',times_attended:0}]};
+      const missingReceipt=await fetch(`${base}/api/natcon.php?action=register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(transferRegistration)});
+      assert.equal(missingReceipt.status,400,'a new bank transfer must include a receipt');
+      const transferResponse=await fetch(`${base}/api/natcon.php?action=register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...transferRegistration,receipt_url:`data:application/pdf;base64,${receiptPdf}`})});
+      const transferOrder=await transferResponse.json();assert.equal(transferResponse.status,200,JSON.stringify(transferOrder));assert.equal(transferOrder.data.status,'awaiting_review');assert.equal(transferOrder.data.receipt_url,undefined,'the public order response must not echo receipt contents');
+      const wrongMime=await fetch(`${base}/api/natcon.php?action=register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...transferRegistration,receipt_url:`data:image/png;base64,${receiptPdf}`})});
+      assert.equal(wrongMime.status,400,'receipt MIME must match its decoded file content');
+      const prepaidResponse=await fetch(`${base}/api/natcon.php?action=register`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...transferRegistration,payer_email:'prepaid@example.test',payment_method:'transfer_prepaid',receipt_url:`data:application/pdf;base64,${receiptPdf}`,delegates:transferRegistration.delegates.map(delegate=>({...delegate,delegate_card_id:'TAA/NC/REFORMATION/010'}))})});
+      const prepaidOrder=await prepaidResponse.json();assert.equal(prepaidResponse.status,200,JSON.stringify(prepaidOrder));assert.equal(prepaidOrder.data.status,'awaiting_review');
+      const transferList=await fetch(`${base}/api/natcon.php?action=transfers`,{headers:{Cookie:cookie}});const listedTransfers=(await transferList.json()).data;
+      assert(listedTransfers.some(transfer=>transfer.reference===transferOrder.data.reference&&transfer.receipt_url.startsWith('data:application/pdf;base64,')),'Finance can retrieve submitted receipt data');
       console.log('PASS public event checkout, Admin session/CSRF event content, and authenticated attendee photo HTTP flows');
     } finally { server.kill(); }
   } finally { fs.rmSync(temp, {recursive:true,force:true}); }

@@ -52,14 +52,14 @@ class LocaleString extends Translations {
           "Continue as a Guest": "अतिथि के रूप में जारी रखें",
           "MagicMate": "आखिरकार",
           "Find your favorite events here": "अपने पसंदीदा कार्यक्रम यहां खोजें",
-          "Connect, Discover, and Experience \n All with Join Event App!":
+          "Connect, Discover, and Experience \n All with NATCON App!":
               "कनेक्ट करें, खोजें, और अनुभव करें \n सभी जॉइन इवेंट ऐप के साथ!",
           "Find your nearby event here": "अपने आस-पास की घटना यहाँ खोजें",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "मस्ती में शामिल हों - आपका एक \n इवेंट्स के लिए स्टॉप डेस्टिनेशन!",
           "Update your upcoming event here":
               "अपने आगामी कार्यक्रम को यहां अपडेट करें",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "जीवन को पूरी तरह से अनुभव करें \n इवेंट ऐप में शामिल हों, आपने इसे कवर किया है!",
           "Get Started": "शुरू हो जाओ",
           "Skip": "छोडना",
@@ -273,13 +273,13 @@ class LocaleString extends Translations {
           "Continue as a Guest": "تواصل كضيف",
           "MagicMate": "على الدوام",
           "Find your favorite events here": "ابحث عن الأحداث المفضلة لديك هنا",
-          "Connect, Discover, and Experience \n All with Join Event App!":
+          "Connect, Discover, and Experience \n All with NATCON App!":
               "تواصل واكتشف واختبر \n كل ذلك باستخدام تطبيق الانضمام إلى الحدث!",
           "Find your nearby event here": "ابحث عن الحدث المجاور لك هنا ",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "انضم إلى المرح - وجهتك الوحيدة \n توقف عن وجهتك للأحداث! ",
           "Update your upcoming event here": "قم بتحديث حدثك القادم هنا",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "تجربة الحياة على أكمل وجه \n انضم إلى تطبيق الحدث الذي قمت بتغطيته!",
           "Get Started": "البدء",
           "Skip": "يتخطى",
@@ -494,16 +494,16 @@ class LocaleString extends Translations {
           "MagicMate": "Eventuellement",
           "Find your favorite events here":
               "Trouvez vos événements préférés ici",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "Connectez-vous, découvrez et expérimentez \n tout avec l'application Join Event !",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "Connectez-vous, découvrez et expérimentez \n tout avec l'application NATCON !",
           "Find your nearby event here":
               "Trouvez votre événement à proximité ici",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Joignez-vous à l'amusement - votre destination unique \n pour les événements !",
           "Update your upcoming event here":
               "Mettez à jour votre événement à venir ici",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
-              "Vivez la vie au maximum \n L'application Join Event vous couvre !",
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
+              "Vivez la vie au maximum \n L'application NATCON vous couvre !",
           "Get Started": "Commencer",
           "Skip": "Sauter",
           "Next": "Suivant",
@@ -722,15 +722,15 @@ class LocaleString extends Translations {
           "MagicMate": "Eventuell",
           "Find your favorite events here":
               "Finden Sie hier Ihre Lieblingsveranstaltungen",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "Verbinden, entdecken und erleben Sie alles mit der Join Event App!",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "Verbinden, entdecken und erleben Sie alles mit der NATCON App!",
           "Find your nearby event here":
               "Finden Sie hier Ihre Veranstaltung in der Nähe",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Machen Sie mit bei Fun – Ihrem One-Stop-Ziel für Veranstaltungen!",
           "Update your upcoming event here":
               "Aktualisieren Sie hier Ihre bevorstehende Veranstaltung",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "Erleben Sie das Leben in vollen Zügen \n Die App „Mitmachen“ ist genau das Richtige für Sie!",
           "Get Started": "Loslegen",
           "Skip": "Überspringen",
@@ -951,14 +951,14 @@ class LocaleString extends Translations {
           "MagicMate": "Akhirnya",
           "Find your favorite events here":
               "Temukan acara favorit Anda di sini",
-          "Connect, Discover, and Experience \n All with Join Event App!":
+          "Connect, Discover, and Experience \n All with NATCON App!":
               "Terhubung, Temukan, dan Rasakan \n Semua dengan Bergabung di Aplikasi Acara!",
           "Find your nearby event here": "Temukan acara terdekat Anda di sini",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Bergabunglah dengan Keseruan - Tujuan Terpadu Anda untuk Acara!",
           "Update your upcoming event here":
               "Perbarui acara mendatang Anda di sini",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "Rasakan Hidup Sepenuhnya \n Bergabunglah dengan Aplikasi Acara untuk Anda!",
           "Get Started": "Memulai",
           "Skip": "Melewati",
@@ -1179,13 +1179,13 @@ class LocaleString extends Translations {
           "MagicMate": "Acontecidamente",
           "Find your favorite events here":
               "Encontre aqui os seus eventos favoritos",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "Conecte-se, descubra e experimente \n Tudo com o aplicativo Join Event!",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "Conecte-se, descubra e experimente \n Tudo com o aplicativo NATCON!",
           "Find your nearby event here": "Encontre o seu evento próximo aqui",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Junte-se à diversão - seu destino \n único para eventos!",
           "Update your upcoming event here": "Atualize seu próximo evento aqui",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "Experimente a vida ao máximo \n Junte-se ao aplicativo de eventos para você!",
           "Get Started": "Iniciar",
           "Skip": "Pular",
@@ -1402,14 +1402,14 @@ class LocaleString extends Translations {
           "MagicMate": "Eventueel",
           "Find your favorite events here":
               "Vind jou gunsteling geleenthede hier",
-          "Connect, Discover, and Experience \n All with Join Event App!":
+          "Connect, Discover, and Experience \n All with NATCON App!":
               "Koppel, ontdek en ervaar \n Alles met Sluit aan by geleentheid-app!",
           "Find your nearby event here": "Vind jou nabygeleë geleentheid hier",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Sluit aan by die pret - jou een-\n-stop-bestemming vir geleenthede!",
           "Update your upcoming event here":
               "Dateer jou komende geleentheid hier op",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "Ervaar die lewe ten volle \n Sluit aan by geleentheid-app het jou gedek!",
           "Get Started": "Begin",
           "Skip": "Huppel",
@@ -1629,14 +1629,14 @@ class LocaleString extends Translations {
           "MagicMate": "Eventualmente",
           "Find your favorite events here":
               "Encuentra tus eventos favoritos aquí",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "¡Conéctese, descubra y experimente \n todo con la aplicación Join Event!",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "¡Conéctese, descubra y experimente \n todo con la aplicación NATCON!",
           "Find your nearby event here": "Encuentra tu evento cercano aquí",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Únase a la diversión: ¡su único \n destino para eventos!",
           "Update your upcoming event here": "Actualiza tu próximo evento aquí",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
-              "Experimente la vida al máximo \n ¡La aplicación Join Event lo tiene cubierto!",
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
+              "Experimente la vida al máximo \n ¡La aplicación NATCON lo tiene cubierto!",
           "Get Started": "Empezar",
           "Skip": "Saltar",
           "Next": "Próximo",
@@ -1854,14 +1854,14 @@ class LocaleString extends Translations {
           "MagicMate": "er ya da geç",
           "Find your favorite events here":
               "Favori etkinliklerinizi burada bulun",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "Join Event Uygulamasıyla \n Bağlanın, Keşfedin ve Deneyimleyin!",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "NATCON Uygulamasıyla \n Bağlanın, Keşfedin ve Deneyimleyin!",
           "Find your nearby event here": "Yakındaki etkinliğinizi burada bulun",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "Eğlenceye Katılın - Etkinlikler İçin \n Tek Adresiniz!",
           "Update your upcoming event here":
               "Yaklaşan etkinliğinizi buradan güncelleyin",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "Hayatı Dolu Dolu Deneyimle \n Katıl Etkinliği Uygulaması Sizi Kapsıyor!",
           "Get Started": "Başlamak",
           "Skip": "Atlamak",
@@ -2075,13 +2075,13 @@ class LocaleString extends Translations {
           "Continue as a Guest": "以访客身份继续",
           "MagicMate": "终于",
           "Find your favorite events here": "在这里找到您最喜欢的活动",
-          "Connect, Discover, and Experience \n All with Join Event App!":
-              "使用 Join Event App 连接、发现和体验\n！",
+          "Connect, Discover, and Experience \n All with NATCON App!":
+              "使用 NATCON App 连接、发现和体验\n！",
           "Find your nearby event here": "在这里找到您附近的活动",
           "Join the Fun - Your One \n Stop Destination for Events!":
               "加入乐趣 - 您的一站式活动目的地！",
           "Update your upcoming event here": "在这里更新您即将举行的活动",
-          "Experience Life to the Fullest \n Join Event App has You Covered!":
+          "Experience Life to the Fullest \n NATCON App has You Covered!":
               "充分体验生活 \n 加入活动应用程序为您服务！",
           "Get Started": "开始",
           "Skip": "跳过",

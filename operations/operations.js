@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
   const C = window.NatconOperations;
   const api = new C.Api('../api/natcon.php', window.fetch.bind(window));
@@ -27,7 +27,8 @@
   function signedOut() {
     stopCamera(); user = null; selectedToken = ''; api.csrf = ''; delegateRequest++;
     $('app').hidden = true; $('login-view').hidden = false; $('loading').hidden = true;
-    $('approve-dialog').close(); $('payout-review-dialog').close(); $('event-dialog').close(); $('ticket-type-dialog').close(); $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren(); $('payout-list').replaceChildren();
+    ['approve-dialog', 'payout-review-dialog', 'event-dialog', 'ticket-type-dialog', 'coupon-dialog', 'cancel-dialog'].forEach((id) => $(id)?.close());
+    $('password').value = ''; $('delegate-rows').replaceChildren(); $('transfer-list').replaceChildren(); $('payout-list').replaceChildren();
     $('scan-result').replaceChildren(node('h2', 'Waiting for a ticket')); $('logistics').hidden = true;
     $('email').focus();
   }
@@ -68,7 +69,7 @@
     $('event-list').replaceChildren(); $('event-empty').hidden = catalogue.events.length > 0;
     catalogue.events.forEach((event) => {
       const card = node('article', undefined, 'transfer-card'), info = node('div'), actions = node('div', undefined, 'transfer-right');
-      info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} Â· ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} Â· ${event.total_book_ticket || 0} paid delegates`));
+      info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} · ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} · ${event.total_book_ticket || 0} paid delegates`));
       const edit = node('button', 'Edit event', 'secondary'); edit.addEventListener('click', () => openEventEditor(event)); actions.append(edit);
       if (!['cancelled','completed','archived'].includes(event.event_status)) {
         const complete = node('button', 'Mark completed', 'secondary'); complete.addEventListener('click', () => updateEventStatus(event, 'complete')); actions.append(complete);
@@ -104,7 +105,7 @@
   async function updateEventStatus(event, statusAction) {
     const verb=statusAction==='cancel'?'cancel':'mark completed';
     const consequence=statusAction==='cancel'?' Paid orders stay recorded and refunds must be handled by staff.':'';
-    if (!window.confirm(`${verb[0].toUpperCase()+verb.slice(1)} â€œ${event.event_title}â€?${consequence}`)) return;
+    if (!window.confirm(`${verb[0].toUpperCase()+verb.slice(1)} “${event.event_title}”?${consequence}`)) return;
     try { await api.request('event_status',{event_id:event.event_id,status_action:statusAction}); notify(statusAction==='cancel'?'Event cancelled. Paid orders are unchanged.':'Event marked completed.'); await loadCatalogue(); }
     catch (error) { if (error.status===401) handleError(error); else notify(error.message); }
   }
@@ -147,18 +148,18 @@
     });
   }
   function detailCell(primary, secondary) {
-    const td = node('td'); td.append(node('strong', primary || 'â€”')); if (secondary) td.append(node('small', secondary)); return td;
+    const td = node('td'); td.append(node('strong', primary || '—')); if (secondary) td.append(node('small', secondary)); return td;
   }
   async function loadDelegates() {
     const request = ++delegateRequest;
-    $('delegate-count').textContent = 'Loading registrationsâ€¦';
+    $('delegate-count').textContent = 'Loading registrations…';
     const records = await api.request('delegates', undefined, { q: $('delegate-query').value.trim(), status: $('delegate-status').value });
     if (request !== delegateRequest || !user) return;
     $('delegate-rows').replaceChildren(); $('delegate-count').textContent = records.length + ' delegate(s) shown';
     $('delegate-empty').hidden = records.length > 0;
     records.forEach((delegate) => {
       const tr = node('tr');
-      tr.append(detailCell(delegate.name, delegate.email || delegate.whatsapp), detailCell(delegate.course || 'Course not supplied', [delegate.institution, delegate.level, delegate.state_origin, `${delegate.times_attended || 0} NATCONs`].filter(Boolean).join(' Â· ')), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
+      tr.append(detailCell(delegate.name, delegate.email || delegate.whatsapp), detailCell(delegate.course || 'Course not supplied', [delegate.institution, delegate.level, delegate.state_origin, `${delegate.times_attended || 0} NATCONs`].filter(Boolean).join(' · ')), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
       const payment = node('td'), safeStatus = ['paid', 'pending', 'cancelled'].includes(delegate.status) ? delegate.status : '';
       payment.append(node('span', (delegate.status || 'pending').replace(/_/g, ' '), 'status ' + safeStatus)); tr.append(payment);
       tr.append(detailCell(delegate.checked_in ? 'Arrived' : 'Not arrived'));
@@ -183,7 +184,7 @@
           $('cancel-dialog').showModal();
         }); actions.append(cancel);
       }
-      if (!actions.childNodes.length) actions.textContent = 'â€”';
+      if (!actions.childNodes.length) actions.textContent = '—';
       tr.append(actions); $('delegate-rows').append(tr);
     });
   }
@@ -198,11 +199,16 @@
       info.append(node('p', 'Sender: ' + (transfer.sender_name || 'Not supplied')));
       info.append(node('p', 'Bank reference: ' + (transfer.bank_reference || 'Not supplied')));
       info.append(node('p', 'Payment date reported: ' + (transfer.paid_on || 'Not supplied')));
+      if (typeof transfer.receipt_url === 'string' && /^data:(?:application\/pdf|image\/(?:jpeg|png|webp));base64,/.test(transfer.receipt_url)) {
+        const receipt = node('a', 'View uploaded receipt');
+        receipt.href = transfer.receipt_url; receipt.target = '_blank'; receipt.rel = 'noopener noreferrer';
+        receipt.className = 'text-link'; info.append(receipt);
+      }
       const amount = transfer.amount_kobo ?? transfer.total_kobo;
       right.append(node('p', C.money(amount), 'amount'));
       const review = node('button', 'Review & approve', 'primary');
       review.addEventListener('click', () => {
-        approvalReference = transfer.reference; $('approve-details').textContent = transfer.reference + ' Â· ' + C.money(amount) + ' Â· ' + (transfer.sender_name || transfer.payer_name || '');
+        approvalReference = transfer.reference; $('approve-details').textContent = transfer.reference + ' · ' + C.money(amount) + ' · ' + (transfer.sender_name || transfer.payer_name || '');
         $('approve-form').reset(); $('approve-error').hidden = true; $('approve-dialog').showModal(); $('reconciliation-note').focus();
       }); right.append(review); card.append(info, right); $('transfer-list').append(card);
     });
@@ -220,8 +226,8 @@
       const card = node('article', undefined, 'transfer-card'), info = node('div'), right = node('div', undefined, 'transfer-right');
       info.append(node('h3', payout.requester || 'Admin request'));
       info.append(node('p', 'Requested ' + C.dateTime(payout.r_date)));
-      info.append(node('p', payout.r_type + ' Â· ' + (payout.bank_name || '')));
-      info.append(node('p', (payout.acc_name || '') + ' Â· ' + (payout.acc_number || '')));
+      info.append(node('p', payout.r_type + ' · ' + (payout.bank_name || '')));
+      info.append(node('p', (payout.acc_name || '') + ' · ' + (payout.acc_number || '')));
       if (payout.note) info.append(node('p', 'Request note: ' + payout.note));
       const status = node('span', payout.status, 'status ' + (payout.status === 'rejected' ? 'cancelled' : payout.status === 'paid' ? 'paid' : 'pending'));
       info.append(status); right.append(node('p', C.money(payout.amount_kobo), 'amount'));
@@ -238,7 +244,7 @@
   function openPayoutReview(payout, status) {
     payoutReviewId = payout.payout_id; payoutReviewStatus = status;
     $('payout-review-title').textContent = status === 'paid' ? 'Record manual transfer' : status[0].toUpperCase() + status.slice(1) + ' payout';
-    $('payout-review-details').textContent = payout.requester + ' Â· ' + C.money(payout.amount_kobo) + ' Â· ' + payout.bank_name + ' Â· ' + payout.acc_number;
+    $('payout-review-details').textContent = payout.requester + ' · ' + C.money(payout.amount_kobo) + ' · ' + payout.bank_name + ' · ' + payout.acc_number;
     $('payout-review-note').value = ''; $('payout-review-note').minLength = status === 'paid' ? 8 : 4;
     $('payout-review-note').placeholder = status === 'paid' ? 'Bank transfer reference (at least 8 characters) and note' : 'Reason for the decision';
     $('payout-review-error').hidden = true; $('payout-review-dialog').showModal(); $('payout-review-note').focus();
@@ -281,7 +287,7 @@
   }
   function renderResult(kind, title, message, delegate, checkedAt) {
     const result = $('scan-result'); result.className = 'panel result-card ' + kind; result.replaceChildren();
-    result.append(node('span', kind === 'accepted' ? 'âœ“' : kind === 'duplicate' ? '!' : 'Ã—', 'result-symbol'), node('p', 'TICKET VERIFICATION', 'eyebrow'), node('h2', title), node('p', message));
+    result.append(node('span', kind === 'accepted' ? '✓' : kind === 'duplicate' ? '!' : '×', 'result-symbol'), node('p', 'TICKET VERIFICATION', 'eyebrow'), node('h2', title), node('p', message));
     if (delegate) {
       const details = node('dl', undefined, 'result-details');
       [['Delegate', delegate.name], ['Chapter', delegate.chapter || 'Independent'], ['Reference', delegate.reference], ['Recorded', checkedAt ? C.dateTime(checkedAt) : null]].forEach(([label, value]) => {
@@ -303,7 +309,7 @@
       if (!['accepted', 'already_checked_in'].includes(data.result)) throw new Error('The server did not confirm admission. Ask the technical team to check this ticket.');
       selectedToken = token; $('logistics').hidden = false;
       const duplicate = data.result === 'already_checked_in';
-      renderResult(duplicate ? 'duplicate' : 'accepted', duplicate ? 'Already checked in' : 'Welcome to NATCON!', duplicate ? 'This attendance entry already exists. Check the recorded time below.' : (mode === 'reentry' ? 'Re-entry recorded.' : mode === 'daily' ? 'Todayâ€™s attendance recorded.' : 'Ticket valid. First arrival recorded.'), data.delegate, data.checked_at);
+      renderResult(duplicate ? 'duplicate' : 'accepted', duplicate ? 'Already checked in' : 'Welcome to NATCON!', duplicate ? 'This attendance entry already exists. Check the recorded time below.' : (mode === 'reentry' ? 'Re-entry recorded.' : mode === 'daily' ? 'Today’s attendance recorded.' : 'Ticket valid. First arrival recorded.'), data.delegate, data.checked_at);
     } catch (error) {
       if (error.status === 401) { handleError(error); return; }
       const message = error.message;
@@ -311,7 +317,7 @@
       renderResult('rejected', title, message);
     } finally { checking = false; submit.disabled = false; }
   }
-  $('login-form').addEventListener('submit', (event) => {
+  if ($('login-form')) $('login-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('login-error').hidden = true;
     busy(event.submitter || $('login-form').querySelector('button'), async () => {
       try { const session = await api.request('login', { email: $('email').value.trim(), password: $('password').value }); await signedIn(session); }
@@ -324,20 +330,20 @@
       catch (error) { handleError(error); }
     });
   }
-  $('logout').addEventListener('click', (event) => logout(event.currentTarget));
+  if ($('logout')) $('logout').addEventListener('click', (event) => logout(event.currentTarget));
   const mobileLogout = node('button', 'Sign out', 'secondary mobile-signout'); mobileLogout.hidden = true;
   mobileLogout.addEventListener('click', () => logout(mobileLogout)); document.querySelector('.topbar-meta').append(mobileLogout);
   // CSS controls this mobile-only affordance; hidden is removed to keep it reachable.
   mobileLogout.hidden = false;
   document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => changeView(button.dataset.view)));
   document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => changeView(button.dataset.go)));
-  $('refresh').addEventListener('click', (event) => busy(event.currentTarget, async () => { $('page-error').hidden = true; try { await refresh(); } catch (error) { handleError(error); } }));
-  $('search-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await loadDelegates(); } catch (error) { handleError(error); } });
-  $('delegate-status').addEventListener('change', async () => { try { await loadDelegates(); } catch (error) { handleError(error); } });
-  $('start-camera').addEventListener('click', (event) => busy(event.currentTarget, startCamera));
-  $('stop-camera').addEventListener('click', stopCamera);
-  $('checkin-form').addEventListener('submit', (event) => { event.preventDefault(); stopCamera(); checkIn($('ticket-code').value); });
-  $('entitlement-form').addEventListener('submit', (event) => {
+  if ($('refresh')) $('refresh').addEventListener('click', (event) => busy(event.currentTarget, async () => { $('page-error').hidden = true; try { await refresh(); } catch (error) { handleError(error); } }));
+  if ($('search-form')) $('search-form').addEventListener('submit', async (event) => { event.preventDefault(); try { await loadDelegates(); } catch (error) { handleError(error); } });
+  if ($('delegate-status')) $('delegate-status').addEventListener('change', async () => { try { await loadDelegates(); } catch (error) { handleError(error); } });
+  if ($('start-camera')) $('start-camera').addEventListener('click', (event) => busy(event.currentTarget, startCamera));
+  if ($('stop-camera')) $('stop-camera').addEventListener('click', stopCamera);
+  if ($('checkin-form')) $('checkin-form').addEventListener('submit', (event) => { event.preventDefault(); stopCamera(); checkIn($('ticket-code').value); });
+  if ($('entitlement-form')) $('entitlement-form').addEventListener('submit', (event) => {
     event.preventDefault(); if (!selectedToken) return;
     busy(event.submitter || $('entitlement-form').querySelector('button'), async () => {
       try {
@@ -346,8 +352,8 @@
       } catch (error) { handleError(error); }
     });
   });
-  $('cancel-approval').addEventListener('click', () => $('approve-dialog').close());
-  $('approve-form').addEventListener('submit', (event) => {
+  if ($('cancel-approval')) $('cancel-approval').addEventListener('click', () => $('approve-dialog').close());
+  if ($('approve-form')) $('approve-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('approve-error').hidden = true;
     if (!$('credit-confirmed').checked) return;
     busy(event.submitter || $('approve-form').querySelector('button[type="submit"]'), async () => {
@@ -359,8 +365,8 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('approve-error', error); }
     });
   });
-  $('close-cancel').addEventListener('click', () => $('cancel-dialog').close());
-  $('cancel-form').addEventListener('submit', (event) => {
+  if ($('close-cancel')) $('close-cancel').addEventListener('click', () => $('cancel-dialog').close());
+  if ($('cancel-form')) $('cancel-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('cancel-error').hidden = true;
     if (!$('cancel-confirmed').checked) return;
     busy(event.submitter || $('cancel-form').querySelector('button[type="submit"]'), async () => {
@@ -371,7 +377,7 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('cancel-error', error); }
     });
   });
-  $('payout-request-form').addEventListener('submit', (event) => {
+  if ($('payout-request-form')) $('payout-request-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('payout-request-error').hidden = true;
     busy(event.submitter || $('payout-request-form').querySelector('button[type="submit"]'), async () => {
       try {
@@ -381,8 +387,8 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('payout-request-error', error); }
     });
   });
-  $('close-payout-review').addEventListener('click', () => $('payout-review-dialog').close());
-  $('payout-review-form').addEventListener('submit', (event) => {
+  if ($('close-payout-review')) $('close-payout-review').addEventListener('click', () => $('payout-review-dialog').close());
+  if ($('payout-review-form')) $('payout-review-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('payout-review-error').hidden = true;
     busy(event.submitter || $('payout-review-form').querySelector('button[type="submit"]'), async () => {
       try {
@@ -393,14 +399,14 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('payout-review-error', error); }
     });
   });
-  $('new-event').addEventListener('click', () => openEventEditor(null));
-  $('new-coupon').addEventListener('click',()=>openCouponEditor(null));
-  $('close-coupon').addEventListener('click',()=>$('coupon-dialog').close());
-  $('coupon-type').addEventListener('change',()=>{$('coupon-value').step=$('coupon-type').value==='percent'?'1':'0.01';$('coupon-value').max=$('coupon-type').value==='percent'?'100':'';});
-  $('coupon-form').addEventListener('submit',async(event)=>{event.preventDefault();$('coupon-error').hidden=true;try{await api.request('save_coupon',{coupon_id:$('coupon-id').value||null,event_id:$('coupon-event').value,coupon_code:$('coupon-code').value.trim(),title:$('coupon-name').value.trim(),subtitle:$('coupon-subtitle').value.trim(),description:$('coupon-description').value.trim(),discount_type:$('coupon-type').value,coupon_val:$('coupon-value').value.trim(),min_amt:$('coupon-minimum').value.trim(),expire_date:$('coupon-expiry').value,usage_limit:$('coupon-limit').value,status:$('coupon-status').value});$('coupon-dialog').close();notify('Coupon saved to the shared NATCON catalogue.');await loadCatalogue();}catch(error){if(error.status===401)handleError(error);else showError('coupon-error',error);}});
-  $('content-form').addEventListener('submit',async(event)=>{event.preventDefault();$('content-error').hidden=true;const kind=$('content-kind').value;try{if(!catalogue.events.length)throw new Error('Create an event before adding event content.');const title=$('content-title').value.trim(),payload={kind,event_id:$('content-event').value,status:'1'};if(kind==='artist')Object.assign(payload,{artist_name:title,artist_role:$('content-role').value.trim(),img:$('content-image').value.trim()||'0'});else if(kind==='gallery')Object.assign(payload,{title,img:$('content-image').value.trim()});else Object.assign(payload,{title,description:$('content-description').value.trim()});await api.request('save_event_content',payload);$('content-form').reset();notify('Event content saved to the shared NATCON catalogue.');await loadEventContent();}catch(error){if(error.status===401)handleError(error);else showError('content-error',error);}});
-  $('close-event').addEventListener('click', () => $('event-dialog').close());
-  $('event-form').addEventListener('submit', (event) => {
+  if ($('new-event')) $('new-event').addEventListener('click', () => openEventEditor(null));
+  if ($('new-coupon')) $('new-coupon').addEventListener('click',()=>openCouponEditor(null));
+  if ($('close-coupon')) $('close-coupon').addEventListener('click',()=>$('coupon-dialog').close());
+  if ($('coupon-type')) $('coupon-type').addEventListener('change',()=>{$('coupon-value').step=$('coupon-type').value==='percent'?'1':'0.01';$('coupon-value').max=$('coupon-type').value==='percent'?'100':'';});
+  if ($('coupon-form')) $('coupon-form').addEventListener('submit',async(event)=>{event.preventDefault();$('coupon-error').hidden=true;try{await api.request('save_coupon',{coupon_id:$('coupon-id').value||null,event_id:$('coupon-event').value,coupon_code:$('coupon-code').value.trim(),title:$('coupon-name').value.trim(),subtitle:$('coupon-subtitle').value.trim(),description:$('coupon-description').value.trim(),discount_type:$('coupon-type').value,coupon_val:$('coupon-value').value.trim(),min_amt:$('coupon-minimum').value.trim(),expire_date:$('coupon-expiry').value,usage_limit:$('coupon-limit').value,status:$('coupon-status').value});$('coupon-dialog').close();notify('Coupon saved to the shared NATCON catalogue.');await loadCatalogue();}catch(error){if(error.status===401)handleError(error);else showError('coupon-error',error);}});
+  if ($('content-form')) $('content-form').addEventListener('submit',async(event)=>{event.preventDefault();$('content-error').hidden=true;const kind=$('content-kind').value;try{if(!catalogue.events.length)throw new Error('Create an event before adding event content.');const title=$('content-title').value.trim(),payload={kind,event_id:$('content-event').value,status:'1'};if(kind==='artist')Object.assign(payload,{artist_name:title,artist_role:$('content-role').value.trim(),img:$('content-image').value.trim()||'0'});else if(kind==='gallery')Object.assign(payload,{title,img:$('content-image').value.trim()});else Object.assign(payload,{title,description:$('content-description').value.trim()});await api.request('save_event_content',payload);$('content-form').reset();notify('Event content saved to the shared NATCON catalogue.');await loadEventContent();}catch(error){if(error.status===401)handleError(error);else showError('content-error',error);}});
+  if ($('close-event')) $('close-event').addEventListener('click', () => $('event-dialog').close());
+  if ($('event-form')) $('event-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('event-error').hidden = true;
     busy(event.submitter || $('event-form').querySelector('button[type="submit"]'), async () => {
       try {
@@ -409,12 +415,12 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('event-error', error); }
     });
   });
-  $('new-ticket-type').addEventListener('click', () => {
+  if ($('new-ticket-type')) $('new-ticket-type').addEventListener('click', () => {
     if (!catalogue.events.length) { notify('Create an event before adding ticket types.'); return; }
     openTicketEditor(null);
   });
-  $('close-ticket-type').addEventListener('click', () => $('ticket-type-dialog').close());
-  $('ticket-type-form').addEventListener('submit', (event) => {
+  if ($('close-ticket-type')) $('close-ticket-type').addEventListener('click', () => $('ticket-type-dialog').close());
+  if ($('ticket-type-form')) $('ticket-type-form').addEventListener('submit', (event) => {
     event.preventDefault(); $('ticket-type-error').hidden = true;
     busy(event.submitter || $('ticket-type-form').querySelector('button[type="submit"]'), async () => {
       try {
@@ -424,7 +430,7 @@
       } catch (error) { if (error.status === 401) handleError(error); else showError('ticket-type-error', error); }
     });
   });
-  $('export').addEventListener('click', (event) => busy(event.currentTarget, async () => {
+  if ($('export')) $('export').addEventListener('click', (event) => busy(event.currentTarget, async () => {
     try {
       const response = await fetch('../api/natcon.php?action=export', { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok) { const error = new Error('Could not export the register. Check your session and try again.'); error.status = response.status; throw error; }
@@ -439,4 +445,6 @@
     signedOut(); if (error.status !== 401) showError('login-error', error);
   });
 })();
+
+
 
