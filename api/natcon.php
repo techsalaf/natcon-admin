@@ -10,7 +10,7 @@ function requireStaff(array $roles): array {global $db;$user=$_SESSION['user']??
 try {
     $c=config();$action=clean($_GET['action']??'event',50);$method=$_SERVER['REQUEST_METHOD'];
     $db=database($c);if($action==='event'&&$method==='GET')respond(event($c,$db,isset($_GET['event_id'])?clean($_GET['event_id'],32):null));if($action==='public_events'&&$method==='GET')respond(\Natcon\mobileEventCards($db));
-    $raw=file_get_contents('php://input');$bodyLimit=$action==='save_event_content'?4000000:100000;if(strlen($raw)>$bodyLimit)throw new InvalidArgumentException('Request is too large.');
+    $raw=file_get_contents('php://input');$bodyLimit=in_array($action,['save_event_content','register','transfer'],true)?4000000:100000;if(strlen($raw)>$bodyLimit)throw new InvalidArgumentException('Request is too large.');
     $in=$raw!==''?json_decode($raw,true):[];if(!is_array($in))throw new InvalidArgumentException('Invalid JSON request.');
     $getActions=['session','order','payment_verify','wallet_verify','account_wallet','ticket','qr','dashboard','delegates','transfers','export','audit','payouts','account_session','account_profile','account_orders','event_catalogue','public_events','coupons','event_content'];
     if($action==='account_profile'&&!in_array($method,['GET','POST'],true)){http_response_code(405);throw new InvalidArgumentException('Use GET or POST for this action.');}
@@ -102,7 +102,7 @@ try {
         try{query($db,'INSERT INTO natcon_claims(delegate_id,kind,slot,staff_id,created_at) VALUES(?,?,?,?,?)',[$d['id'],$kind,$slot,$user['id'],now()]);audit($db,(string)$user['id'],'entitlement',$d['reference'],['kind'=>$kind,'slot'=>$slot]);respond(['result'=>'accepted','delegate'=>$d]);}catch(PDOException $e){if(!in_array((string)$e->getCode(),['23000','23505'],true))throw $e;respond(['result'=>'already_claimed','delegate'=>$d]);}
     }
     requireStaff(['admin','finance']);
-    if($action==='transfers')respond(query($db,"SELECT reference,payer_name,payer_email,payer_phone,amount_kobo,bank_reference,sender_name,paid_on,created_at FROM natcon_orders WHERE status='awaiting_review' ORDER BY created_at")->fetchAll());
+    if($action==='transfers')respond(query($db,"SELECT reference,payer_name,payer_email,payer_phone,amount_kobo,bank_reference,sender_name,paid_on,created_at,payment_method,receipt_url FROM natcon_orders WHERE status='awaiting_review' ORDER BY created_at")->fetchAll());
     if($action==='approve_transfer'){
         $ref=clean($in['reference']??'');$note=clean($in['note']??'',1000);$verifiedAmount=(int)($in['verified_amount_kobo']??0);
         if(strlen($note)<10)throw new InvalidArgumentException('Enter the bank statement reference and reconciliation note.');$o=query($db,'SELECT * FROM natcon_orders WHERE reference=?',[$ref])->fetch();
@@ -127,3 +127,4 @@ try {
     http_response_code(404);throw new InvalidArgumentException('Unknown action.');
 }catch(InvalidArgumentException $e){if(http_response_code()<400)http_response_code(400);echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);}
 catch(Throwable $e){error_log('NATCON: '.$e->getMessage());http_response_code(503);echo json_encode(['ok'=>false,'error'=>'Service temporarily unavailable. Please contact the organizers or retry shortly.']);}
+

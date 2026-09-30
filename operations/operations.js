@@ -68,7 +68,7 @@
     $('event-list').replaceChildren(); $('event-empty').hidden = catalogue.events.length > 0;
     catalogue.events.forEach((event) => {
       const card = node('article', undefined, 'transfer-card'), info = node('div'), actions = node('div', undefined, 'transfer-right');
-      info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} · ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} · ${event.total_book_ticket || 0} paid delegates`));
+      info.append(node('h3', event.event_title), node('p', `${event.event_start_date || 'Date not set'} Â· ${event.event_place_name || event.event_address || 'Venue not set'}`), node('p', `${event.event_status} Â· ${event.total_book_ticket || 0} paid delegates`));
       const edit = node('button', 'Edit event', 'secondary'); edit.addEventListener('click', () => openEventEditor(event)); actions.append(edit);
       if (!['cancelled','completed','archived'].includes(event.event_status)) {
         const complete = node('button', 'Mark completed', 'secondary'); complete.addEventListener('click', () => updateEventStatus(event, 'complete')); actions.append(complete);
@@ -104,7 +104,7 @@
   async function updateEventStatus(event, statusAction) {
     const verb=statusAction==='cancel'?'cancel':'mark completed';
     const consequence=statusAction==='cancel'?' Paid orders stay recorded and refunds must be handled by staff.':'';
-    if (!window.confirm(`${verb[0].toUpperCase()+verb.slice(1)} “${event.event_title}”?${consequence}`)) return;
+    if (!window.confirm(`${verb[0].toUpperCase()+verb.slice(1)} â€œ${event.event_title}â€?${consequence}`)) return;
     try { await api.request('event_status',{event_id:event.event_id,status_action:statusAction}); notify(statusAction==='cancel'?'Event cancelled. Paid orders are unchanged.':'Event marked completed.'); await loadCatalogue(); }
     catch (error) { if (error.status===401) handleError(error); else notify(error.message); }
   }
@@ -147,18 +147,18 @@
     });
   }
   function detailCell(primary, secondary) {
-    const td = node('td'); td.append(node('strong', primary || '—')); if (secondary) td.append(node('small', secondary)); return td;
+    const td = node('td'); td.append(node('strong', primary || 'â€”')); if (secondary) td.append(node('small', secondary)); return td;
   }
   async function loadDelegates() {
     const request = ++delegateRequest;
-    $('delegate-count').textContent = 'Loading registrations…';
+    $('delegate-count').textContent = 'Loading registrationsâ€¦';
     const records = await api.request('delegates', undefined, { q: $('delegate-query').value.trim(), status: $('delegate-status').value });
     if (request !== delegateRequest || !user) return;
     $('delegate-rows').replaceChildren(); $('delegate-count').textContent = records.length + ' delegate(s) shown';
     $('delegate-empty').hidden = records.length > 0;
     records.forEach((delegate) => {
       const tr = node('tr');
-      tr.append(detailCell(delegate.name, delegate.email || delegate.whatsapp), detailCell(delegate.course || 'Course not supplied', [delegate.institution, delegate.level, delegate.state_origin, `${delegate.times_attended || 0} NATCONs`].filter(Boolean).join(' · ')), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
+      tr.append(detailCell(delegate.name, delegate.email || delegate.whatsapp), detailCell(delegate.course || 'Course not supplied', [delegate.institution, delegate.level, delegate.state_origin, `${delegate.times_attended || 0} NATCONs`].filter(Boolean).join(' Â· ')), detailCell(delegate.reference, 'Order total ' + C.money(delegate.amount_kobo)));
       const payment = node('td'), safeStatus = ['paid', 'pending', 'cancelled'].includes(delegate.status) ? delegate.status : '';
       payment.append(node('span', (delegate.status || 'pending').replace(/_/g, ' '), 'status ' + safeStatus)); tr.append(payment);
       tr.append(detailCell(delegate.checked_in ? 'Arrived' : 'Not arrived'));
@@ -183,7 +183,7 @@
           $('cancel-dialog').showModal();
         }); actions.append(cancel);
       }
-      if (!actions.childNodes.length) actions.textContent = '—';
+      if (!actions.childNodes.length) actions.textContent = 'â€”';
       tr.append(actions); $('delegate-rows').append(tr);
     });
   }
@@ -202,7 +202,7 @@
       right.append(node('p', C.money(amount), 'amount'));
       const review = node('button', 'Review & approve', 'primary');
       review.addEventListener('click', () => {
-        approvalReference = transfer.reference; $('approve-details').textContent = transfer.reference + ' · ' + C.money(amount) + ' · ' + (transfer.sender_name || transfer.payer_name || '');
+        approvalReference = transfer.reference; $('approve-details').textContent = transfer.reference + ' Â· ' + C.money(amount) + ' Â· ' + (transfer.sender_name || transfer.payer_name || '');
         $('approve-form').reset(); $('approve-error').hidden = true; $('approve-dialog').showModal(); $('reconciliation-note').focus();
       }); right.append(review); card.append(info, right); $('transfer-list').append(card);
     });
@@ -220,8 +220,8 @@
       const card = node('article', undefined, 'transfer-card'), info = node('div'), right = node('div', undefined, 'transfer-right');
       info.append(node('h3', payout.requester || 'Admin request'));
       info.append(node('p', 'Requested ' + C.dateTime(payout.r_date)));
-      info.append(node('p', payout.r_type + ' · ' + (payout.bank_name || '')));
-      info.append(node('p', (payout.acc_name || '') + ' · ' + (payout.acc_number || '')));
+      info.append(node('p', payout.r_type + ' Â· ' + (payout.bank_name || '')));
+      info.append(node('p', (payout.acc_name || '') + ' Â· ' + (payout.acc_number || '')));
       if (payout.note) info.append(node('p', 'Request note: ' + payout.note));
       const status = node('span', payout.status, 'status ' + (payout.status === 'rejected' ? 'cancelled' : payout.status === 'paid' ? 'paid' : 'pending'));
       info.append(status); right.append(node('p', C.money(payout.amount_kobo), 'amount'));
@@ -238,7 +238,7 @@
   function openPayoutReview(payout, status) {
     payoutReviewId = payout.payout_id; payoutReviewStatus = status;
     $('payout-review-title').textContent = status === 'paid' ? 'Record manual transfer' : status[0].toUpperCase() + status.slice(1) + ' payout';
-    $('payout-review-details').textContent = payout.requester + ' · ' + C.money(payout.amount_kobo) + ' · ' + payout.bank_name + ' · ' + payout.acc_number;
+    $('payout-review-details').textContent = payout.requester + ' Â· ' + C.money(payout.amount_kobo) + ' Â· ' + payout.bank_name + ' Â· ' + payout.acc_number;
     $('payout-review-note').value = ''; $('payout-review-note').minLength = status === 'paid' ? 8 : 4;
     $('payout-review-note').placeholder = status === 'paid' ? 'Bank transfer reference (at least 8 characters) and note' : 'Reason for the decision';
     $('payout-review-error').hidden = true; $('payout-review-dialog').showModal(); $('payout-review-note').focus();
@@ -281,7 +281,7 @@
   }
   function renderResult(kind, title, message, delegate, checkedAt) {
     const result = $('scan-result'); result.className = 'panel result-card ' + kind; result.replaceChildren();
-    result.append(node('span', kind === 'accepted' ? '✓' : kind === 'duplicate' ? '!' : '×', 'result-symbol'), node('p', 'TICKET VERIFICATION', 'eyebrow'), node('h2', title), node('p', message));
+    result.append(node('span', kind === 'accepted' ? 'âœ“' : kind === 'duplicate' ? '!' : 'Ã—', 'result-symbol'), node('p', 'TICKET VERIFICATION', 'eyebrow'), node('h2', title), node('p', message));
     if (delegate) {
       const details = node('dl', undefined, 'result-details');
       [['Delegate', delegate.name], ['Chapter', delegate.chapter || 'Independent'], ['Reference', delegate.reference], ['Recorded', checkedAt ? C.dateTime(checkedAt) : null]].forEach(([label, value]) => {
@@ -303,7 +303,7 @@
       if (!['accepted', 'already_checked_in'].includes(data.result)) throw new Error('The server did not confirm admission. Ask the technical team to check this ticket.');
       selectedToken = token; $('logistics').hidden = false;
       const duplicate = data.result === 'already_checked_in';
-      renderResult(duplicate ? 'duplicate' : 'accepted', duplicate ? 'Already checked in' : 'Welcome to NATCON!', duplicate ? 'This attendance entry already exists. Check the recorded time below.' : (mode === 'reentry' ? 'Re-entry recorded.' : mode === 'daily' ? 'Today’s attendance recorded.' : 'Ticket valid. First arrival recorded.'), data.delegate, data.checked_at);
+      renderResult(duplicate ? 'duplicate' : 'accepted', duplicate ? 'Already checked in' : 'Welcome to NATCON!', duplicate ? 'This attendance entry already exists. Check the recorded time below.' : (mode === 'reentry' ? 'Re-entry recorded.' : mode === 'daily' ? 'Todayâ€™s attendance recorded.' : 'Ticket valid. First arrival recorded.'), data.delegate, data.checked_at);
     } catch (error) {
       if (error.status === 401) { handleError(error); return; }
       const message = error.message;
@@ -439,3 +439,4 @@
     signedOut(); if (error.status !== 401) showError('login-error', error);
   });
 })();
+
