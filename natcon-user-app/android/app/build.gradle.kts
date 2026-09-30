@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.eventlycustomerapp"
+    namespace = "com.taa.natcon.user"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.eventlycustomerapp"
+        applicationId = "com.taa.natcon.user"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -50,3 +50,5 @@ dependencies {
 flutter {
     source = "../.."
 }
+
+

@@ -1,9 +1,9 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.eventlycustomerapp">
+﻿<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.taa.natcon.user">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <application
-        android:label="TAA NATCON"
+        android:label="NATCON 26"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <meta-data
@@ -49,3 +49,4 @@
         </intent>
     </queries>
 </manifest>
+
